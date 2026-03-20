@@ -1,0 +1,177 @@
+@import "tailwindcss";
+@import "highlight.js/styles/github.css";
+@plugin "@tailwindcss/typography";
+@plugin "tailwindcss-animate";
+
+@layer utilities {
+  .scrollbar-hide {
+    /* IE and Edge */
+    -ms-overflow-style: none;
+    /* Firefox */
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    /* Chrome, Safari and Opera */
+    display: none;
+  }
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Markdown prose 样式 */
+.message-content {
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+
+.message-content p {
+  margin-bottom: 0.75em;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content ul,
+.message-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.message-content li {
+  margin: 0.25em 0;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+
+.message-content h1 {
+  font-size: 1.25em;
+}
+
+.message-content h2 {
+  font-size: 1.125em;
+}
+
+.message-content h3 {
+  font-size: 1em;
+}
+
+.message-content blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: #6b7280;
+}
+
+.message-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.message-content code {
+  background: #f3f4f6;
+  padding: 0.15em 0.4em;
+  border-radius: 0.25em;
+  font-size: 0.875em;
+  font-family: var(--font-mono), monospace;
+}
+
+.message-content pre {
+  margin: 0.75em 0;
+  border-radius: 0.5em;
+  overflow-x: auto;
+}
+
+.message-content pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.8125em;
+}
+
+.message-content pre.hljs {
+  padding: 1em;
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+}
+
+/* 代码块复制按钮 */
+.copy-btn {
+  position: absolute;
+  top: 0.5em;
+  right: 0.5em;
+  padding: 0.25em 0.5em;
+  font-size: 0.75em;
+  background: #e5e7eb;
+  border: none;
+  border-radius: 0.25em;
+  cursor: pointer;
+  color: #4b5563;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+pre:hover .copy-btn {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  background: #d1d5db;
+}
+
+/* 表格 */
+.message-content table {
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  width: 100%;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.message-content th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
