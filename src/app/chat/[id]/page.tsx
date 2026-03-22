@@ -9,13 +9,17 @@ import { EmptyState } from '@/components/chat/EmptyState';
 
 export default function ConversationPage() {
   const params = useParams();
-  const { messages, selectConversation } = useChatStore();
+  const { messages, currentConversationId, selectConversation } = useChatStore();
 
   useEffect(() => {
-    if (params.id && typeof params.id === 'string') {
-      selectConversation(params.id);
+    const id = params.id;
+    if (id && typeof id === 'string' && id !== currentConversationId) {
+      // 仅当 store 中的会话 ID 与路由不一致时才加载
+      // 流式过程中路由从 /chat 同步到 /chat/[id]，此时 store 已经是对的，不需要重新加载
+      selectConversation(id);
     }
-  }, [params.id, selectConversation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
 
   return (
     <>
