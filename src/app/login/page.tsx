@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { setTokens, isAuthenticated } from '@/lib/auth';
+import { setTokens } from '@/lib/auth';
 import { getApiUrl } from '@/lib/config';
 
 export default function LoginPage() {
@@ -12,13 +12,6 @@ export default function LoginPage() {
   const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // 已登录则跳转
-  useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace('/chat');
-    }
-  }, [router]);
 
   // 倒计时
   useEffect(() => {

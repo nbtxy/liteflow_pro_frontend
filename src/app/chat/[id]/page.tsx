@@ -1,11 +1,11 @@
 'use client';
 
-import { EmptyState } from '@/components/chat/EmptyState';
-import { ChatInput } from '@/components/chat/ChatInput';
 import { useChatStore } from '@/stores/chat';
 import { MessageList } from '@/components/chat/MessageList';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { EmptyState } from '@/components/chat/EmptyState';
 
-export default function ChatPage() {
+export default function ConversationPage() {
   const { messages } = useChatStore();
 
   return (
