@@ -182,7 +182,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
+                // 已有 assistant 消息，追加错误到内容中
                 msgs[msgs.length - 1] = { ...last, content: last.content + `\n\n⚠️ ${event.message}` };
+              } else {
+                // stream_start 之前就出错了，创建一条 assistant 错误消息
+                msgs.push({
+                  id: `error-${Date.now()}`,
+                  conversationId: newConversationId ?? '',
+                  role: 'assistant',
+                  content: `⚠️ ${event.message}`,
+                  createdAt: new Date().toISOString(),
+                });
               }
               return { messages: msgs };
             });
@@ -190,8 +200,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           }
         }
       }
-    } catch {
-      // aborted or network error
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        toast.error('消息发送失败，请检查网络连接');
+      }
     } finally {
       set({ isStreaming: false, abortController: null });
       // 刷新会话列表（标题可能已更新）

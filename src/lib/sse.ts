@@ -56,9 +56,13 @@ export async function* streamChat(
       buffer = lines.pop()!; // 最后一行可能不完整
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        const trimmedLine = line.trimEnd();           // 去除可能的 \r
+        if (trimmedLine.startsWith('data:')) {
+          const payload = trimmedLine.startsWith('data: ')
+            ? trimmedLine.slice(6)
+            : trimmedLine.slice(5);
           try {
-            const data = JSON.parse(line.slice(6));
+            const data = JSON.parse(payload);
             yield data as ChatEvent;
           } catch {
             // 忽略解析错误的行
