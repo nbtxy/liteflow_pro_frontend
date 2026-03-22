@@ -52,25 +52,25 @@ export function MessageList() {
 
   const [feedbackState, setFeedbackState] = useState<{
     messageId: string;
-    type: 'like' | 'dislike' | null;
+    type: 'up' | 'down' | null;
     showModal: boolean;
   }>({ messageId: '', type: null, showModal: false });
 
   const [feedbackReason, setFeedbackReason] = useState('');
 
-  const handleFeedback = useCallback(async (messageId: string, type: 'like' | 'dislike') => {
-    if (type === 'dislike') {
+  const handleFeedback = useCallback(async (messageId: string, type: 'up' | 'down') => {
+    if (type === 'down') {
       setFeedbackState({ messageId, type, showModal: true });
       return;
     }
 
-    // 提交 like
+    // 提交 up
     try {
       await apiFetch(`/api/messages/${messageId}/feedback`, {
         method: 'POST',
-        body: JSON.stringify({ type }),
+        body: JSON.stringify({ rating: type }),
       });
-      setFeedbackState({ messageId, type: 'like', showModal: false });
+      setFeedbackState({ messageId, type: 'up', showModal: false });
       toast.success('感谢您的反馈');
     } catch {
       toast.error('反馈提交失败');
@@ -82,7 +82,7 @@ export function MessageList() {
     try {
       await apiFetch(`/api/messages/${feedbackState.messageId}/feedback`, {
         method: 'POST',
-        body: JSON.stringify({ type: 'dislike', reason: feedbackReason }),
+        body: JSON.stringify({ rating: 'down', comment: feedbackReason }),
       });
       setFeedbackState((prev) => ({ ...prev, showModal: false }));
       setFeedbackReason('');
@@ -177,9 +177,9 @@ export function MessageList() {
                 {isAssistant && !isStreaming && msg.content && (
                   <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
                     <button
-                      onClick={() => handleFeedback(msg.id, 'like')}
+                      onClick={() => handleFeedback(msg.id, 'up')}
                       className={`p-1 transition-colors ${
-                        feedbackState.messageId === msg.id && feedbackState.type === 'like'
+                        feedbackState.messageId === msg.id && feedbackState.type === 'up'
                           ? 'text-green-500'
                           : 'text-gray-400 hover:text-green-500'
                       }`}
@@ -190,9 +190,9 @@ export function MessageList() {
                       </svg>
                     </button>
                     <button
-                      onClick={() => handleFeedback(msg.id, 'dislike')}
+                      onClick={() => handleFeedback(msg.id, 'down')}
                       className={`p-1 transition-colors ${
-                        feedbackState.messageId === msg.id && feedbackState.type === 'dislike'
+                        feedbackState.messageId === msg.id && feedbackState.type === 'down'
                           ? 'text-red-500'
                           : 'text-gray-400 hover:text-red-500'
                       }`}

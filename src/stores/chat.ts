@@ -49,11 +49,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   loadConversations: async () => {
     set({ conversationsLoading: true });
     try {
-      const res = await apiFetch('/api/conversations');
-      if (res.ok) {
-        const data = await res.json();
-        set({ conversations: data.data?.items ?? data.data ?? [] });
-      }
+      const data = await apiFetch('/api/conversations');
+      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      set({ conversations: list });
     } catch {
       toast.error('加载会话列表失败');
     } finally {
@@ -66,11 +64,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return get().loadConversations();
     }
     try {
-      const res = await apiFetch(`/api/conversations/search?q=${encodeURIComponent(query)}`);
-      if (res.ok) {
-        const data = await res.json();
-        set({ conversations: data.data?.items ?? data.data ?? [] });
-      }
+      const data = await apiFetch(`/api/conversations/search?q=${encodeURIComponent(query)}`);
+      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      set({ conversations: list });
     } catch {
       toast.error('搜索会话失败');
     }
@@ -91,20 +87,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   deleteConversation: async (id: string) => {
     try {
-      const res = await apiFetch(`/api/conversations/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        const { conversations, currentConversationId } = get();
-        const updated = conversations.filter((c) => c.id !== id);
-        set({ conversations: updated });
-        if (currentConversationId === id) {
-          if (updated.length > 0) {
-            await get().selectConversation(updated[0].id);
-          } else {
-            set({ currentConversationId: null, messages: [] });
-          }
+      await apiFetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      const { conversations, currentConversationId } = get();
+      const updated = conversations.filter((c) => c.id !== id);
+      set({ conversations: updated });
+      if (currentConversationId === id) {
+        if (updated.length > 0) {
+          await get().selectConversation(updated[0].id);
+        } else {
+          set({ currentConversationId: null, messages: [] });
         }
-        toast.success('删除成功');
       }
+      toast.success('删除成功');
     } catch {
       toast.error('删除会话失败');
     }
@@ -113,11 +107,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   loadMessages: async (conversationId: string) => {
     set({ messagesLoading: true });
     try {
-      const res = await apiFetch(`/api/conversations/${conversationId}/messages`);
-      if (res.ok) {
-        const data = await res.json();
-        set({ messages: data.data?.items ?? data.data ?? [] });
-      }
+      const data = await apiFetch(`/api/conversations/${conversationId}/messages`);
+      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      set({ messages: list });
     } catch {
       toast.error('加载历史消息失败');
     } finally {

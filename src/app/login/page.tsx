@@ -41,6 +41,11 @@ export default function LoginPage() {
         setError(data?.message ?? '发送失败');
         return;
       }
+      const data = await res.json();
+      if (data.code !== 200) {
+        setError(data.message || '发送失败');
+        return;
+      }
       setCountdown(60);
     } catch {
       setError('网络错误，请重试');
@@ -62,8 +67,13 @@ export default function LoginPage() {
         setError(data?.message ?? '登录失败');
         return;
       }
-      const data = await res.json();
-      setTokens(data.data?.accessToken ?? data.accessToken, data.data?.refreshToken ?? data.refreshToken);
+      const json = await res.json();
+      if (json.code !== 200) {
+        setError(json.message || '登录失败');
+        return;
+      }
+      const data = json.data;
+      setTokens(data.accessToken, data.refreshToken);
       router.replace('/chat');
     } catch {
       setError('网络错误，请重试');

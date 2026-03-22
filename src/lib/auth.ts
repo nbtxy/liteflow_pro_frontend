@@ -37,8 +37,16 @@ export async function refreshAccessToken(): Promise<string | null> {
       clearTokens();
       return null;
     }
-    const data = await res.json();
+    const json = await res.json();
+    if (json.code !== 200) {
+      clearTokens();
+      return null;
+    }
+    const data = json.data;
     localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+    }
     return data.accessToken;
   } catch {
     clearTokens();
