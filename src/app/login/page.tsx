@@ -4,9 +4,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { setTokens } from '@/lib/auth';
 import { getApiUrl } from '@/lib/config';
+import { useLanguage } from '@/lib/i18n/context';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { locale, setLocale, t } = useLanguage();
+  const toggleLanguage = () => setLocale(locale === 'zh' ? 'en' : 'zh');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -31,19 +34,19 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(data?.message ?? '发送失败');
+        setError(data?.message ?? t.login.sendFailed);
         return;
       }
       const data = await res.json();
       if (data.code !== 200) {
-        setError(data.message || '发送失败');
+        setError(data.message || t.login.sendFailed);
         return;
       }
       setCountdown(60);
     } catch {
-      setError('网络错误，请重试');
+      setError(t.login.networkError);
     }
-  }, [phone, countdown]);
+  }, [phone, countdown, t]);
 
   const handleLogin = useCallback(async () => {
     if (!phone.trim() || !code.trim()) return;
@@ -57,28 +60,43 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(data?.message ?? '登录失败');
+        setError(data?.message ?? t.login.loginFailed);
         return;
       }
       const json = await res.json();
       if (json.code !== 200) {
-        setError(json.message || '登录失败');
+        setError(json.message || t.login.loginFailed);
         return;
       }
       const data = json.data;
       setTokens(data.accessToken, data.refreshToken);
       router.replace('/chat');
     } catch {
-      setError('网络错误，请重试');
+      setError(t.login.networkError);
     } finally {
       setLoading(false);
     }
-  }, [phone, code, router]);
+  }, [phone, code, router, t]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
+      {/* 语言切换按钮 */}
+      <div className="absolute top-4 right-4">
+        <button
+          onClick={toggleLanguage}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+          </svg>
+          {locale === 'zh' ? 'English' : '中文'}
+        </button>
+      </div>
+
       <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-lg">
-        <h1 className="text-2xl font-bold text-center mb-8 text-gray-900">LiteFlow Assistant</h1>
+        <h1 className="text-2xl font-bold text-center mb-8 text-gray-900">
+          {t.login.title}
+        </h1>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">{error}</div>
@@ -87,12 +105,14 @@ export default function LoginPage() {
         <div className="space-y-4">
           {/* 手机号 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">手机号</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t.login.phoneLabel}
+            </label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="请输入手机号"
+              placeholder={t.login.phonePlaceholder}
               maxLength={11}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900 placeholder-gray-400"
             />
@@ -100,13 +120,15 @@ export default function LoginPage() {
 
           {/* 验证码 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">验证码</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t.login.codeLabel}
+            </label>
             <div className="flex gap-3">
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="请输入验证码"
+                placeholder={t.login.codePlaceholder}
                 maxLength={6}
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900 placeholder-gray-400"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
@@ -116,7 +138,9 @@ export default function LoginPage() {
                 disabled={countdown > 0 || !phone.trim()}
                 className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
               >
-                {countdown > 0 ? `${countdown}s` : '发送验证码'}
+                {countdown > 0 
+                  ? `${countdown}s` 
+                  : t.login.sendCode}
               </button>
             </div>
           </div>
@@ -127,7 +151,9 @@ export default function LoginPage() {
             disabled={loading || !phone.trim() || !code.trim()}
             className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? '登录中...' : '登录'}
+            {loading 
+              ? t.login.submitting 
+              : t.login.submit}
           </button>
         </div>
       </div>

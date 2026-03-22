@@ -1,12 +1,17 @@
 'use client';
 
+import { useEffect } from 'react';
 import { EmptyState } from '@/components/chat/EmptyState';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { useChatStore } from '@/stores/chat';
 import { MessageList } from '@/components/chat/MessageList';
 
 export default function ChatPage() {
-  const { messages } = useChatStore();
+  const { messages, createConversation } = useChatStore();
+
+  useEffect(() => {
+    createConversation();
+  }, [createConversation]);
 
   return (
     <>

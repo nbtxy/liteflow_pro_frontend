@@ -4,11 +4,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearTokens } from '@/lib/auth';
 import { toast } from '@/components/ui/Toast';
+import { useLanguage } from '@/lib/i18n/context';
 
 export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { locale, setLocale, t } = useLanguage();
+  const toggleLanguage = () => setLocale(locale === 'zh' ? 'en' : 'zh');
 
   // Mock user data
   const user = {
@@ -30,7 +33,7 @@ export function UserMenu() {
 
   const handleLogout = () => {
     clearTokens();
-    toast.success('已退出登录');
+    toast.success(t.common.loggedOut);
     router.push('/login');
   };
 
@@ -44,6 +47,26 @@ export function UserMenu() {
             <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
           </div>
           
+          <div className="py-1 border-b border-gray-100">
+            <button
+              onClick={() => {
+                toggleLanguage();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                </svg>
+                {t.common.language}
+              </div>
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                {locale === 'zh' ? '中文' : 'EN'}
+              </span>
+            </button>
+          </div>
+
           <div className="py-1">
             <button
               onClick={handleLogout}
@@ -52,7 +75,7 @@ export function UserMenu() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
-              退出登录
+              {t.common.signOut}
             </button>
           </div>
         </div>

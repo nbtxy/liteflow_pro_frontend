@@ -3,6 +3,17 @@ import type { Message, Conversation } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
 import { streamChat } from '@/lib/sse';
 import { toast } from '@/components/ui/Toast';
+import { translations } from '@/lib/i18n/translations';
+import { getPreferredLanguage } from '@/lib/i18n/languageUtils';
+
+// Helper to get current locale translations safely outside React components
+const getT = () => {
+  if (typeof window !== 'undefined') {
+    const locale = getPreferredLanguage();
+    return translations[locale] || translations.en;
+  }
+  return translations.en;
+};
 
 interface ChatStore {
   // 会话
@@ -53,7 +64,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
       set({ conversations: list });
     } catch {
-      toast.error('加载会话列表失败');
+      toast.error(getT().chat.loadConversationsFailed);
     } finally {
       set({ conversationsLoading: false });
     }
@@ -68,7 +79,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
       set({ conversations: list });
     } catch {
-      toast.error('搜索会话失败');
+      toast.error(getT().chat.searchConversationsFailed);
     }
   },
 
@@ -98,9 +109,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           set({ currentConversationId: null, messages: [] });
         }
       }
-      toast.success('删除成功');
+      toast.success(getT().common.deleteSuccess);
     } catch {
-      toast.error('删除会话失败');
+      toast.error(getT().chat.deleteConversationFailed);
     }
   },
 
@@ -111,7 +122,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
       set({ messages: list });
     } catch {
-      toast.error('加载历史消息失败');
+      toast.error(getT().chat.loadMessagesFailed);
     } finally {
       set({ messagesLoading: false });
     }
@@ -194,7 +205,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
     } catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        toast.error('消息发送失败，请检查网络连接');
+        toast.error(getT().chat.sendMessageFailed);
       }
     } finally {
       set({ isStreaming: false, abortController: null });

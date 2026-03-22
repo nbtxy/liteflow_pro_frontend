@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/stores/chat';
 import { ConversationList } from '@/components/chat/ConversationList';
 
@@ -10,23 +10,21 @@ export default function ChatLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const { sidebarOpen, toggleSidebar, setSidebarOpen } = useChatStore();
+  const router = useRouter();
+  const { currentConversationId, sidebarOpen, toggleSidebar, setSidebarOpen } = useChatStore();
 
-  // Sync route with store (URL changes -> Store updates)
+  // Sync store with route (Store updates -> URL changes)
+  // This ensures that when a new conversation is created via streaming,
+  // the URL updates from /chat to /chat/[id]
   useEffect(() => {
-    const match = pathname.match(/^\/chat\/([^/]+)$/);
-    const storeId = useChatStore.getState().currentConversationId;
-    if (match) {
-      if (storeId !== match[1]) {
-        useChatStore.getState().selectConversation(match[1]);
-      }
-    } else if (pathname === '/chat') {
-      if (storeId !== null) {
-        useChatStore.getState().createConversation();
+    const currentPath = window.location.pathname;
+    if (currentConversationId) {
+      const match = currentPath.match(/^\/chat\/([^/]+)$/);
+      if (!match || match[1] !== currentConversationId) {
+        router.replace(`/chat/${currentConversationId}`);
       }
     }
-  }, [pathname]); // Only depend on pathname changes!
+  }, [currentConversationId, router]);
 
   return (
     <div className="flex h-screen bg-gray-50">
