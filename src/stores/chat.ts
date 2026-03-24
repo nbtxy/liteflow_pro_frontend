@@ -32,6 +32,9 @@ interface ChatStore {
   // 侧边栏（移动端）
   sidebarOpen: boolean;
 
+  // 侧边栏（桌面端）
+  desktopSidebarOpen: boolean;
+
   // Actions
   loadConversations: () => Promise<void>;
   searchConversations: (query: string) => Promise<void>;
@@ -45,6 +48,8 @@ interface ChatStore {
   editAndResendMessage: (messageId: string, newContent: string) => Promise<void>;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
+  toggleDesktopSidebar: () => void;
+  setDesktopSidebarOpen: (open: boolean) => void;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -56,6 +61,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isStreaming: false,
   abortController: null,
   sidebarOpen: false,
+  desktopSidebarOpen: true,
 
   loadConversations: async () => {
     set({ conversationsLoading: true });
@@ -325,4 +331,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
+  toggleDesktopSidebar: () => set((state) => ({ desktopSidebarOpen: !state.desktopSidebarOpen })),
+  setDesktopSidebarOpen: (open: boolean) => set({ desktopSidebarOpen: open }),
 }));

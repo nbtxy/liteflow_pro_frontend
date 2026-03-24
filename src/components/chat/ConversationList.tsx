@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/stores/chat';
 import { Spinner } from '@/components/ui/Spinner';
 import { UserMenu } from './UserMenu';
+import { useLanguage } from '@/lib/i18n/context';
 
 export function ConversationList() {
   const router = useRouter();
+  const { t } = useLanguage();
   const {
     conversations,
     currentConversationId,
@@ -17,6 +19,8 @@ export function ConversationList() {
     selectConversation,
     createConversation,
     deleteConversation,
+    desktopSidebarOpen,
+    toggleDesktopSidebar,
   } = useChatStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,81 +55,112 @@ export function ConversationList() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* 顶部标题和折叠按钮 */}
+      <div className={`flex items-center ${desktopSidebarOpen ? 'justify-between px-4' : 'justify-center'} h-14 shrink-0`}>
+        {desktopSidebarOpen && (
+          <h1 className="text-lg font-semibold text-gray-900 truncate">LiteFlow</h1>
+        )}
+        <button
+          onClick={toggleDesktopSidebar}
+          className="p-2 rounded-lg text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100"
+          title={desktopSidebarOpen ? t.common.closeSidebar : t.common.openSidebar}
+        >
+          {desktopSidebarOpen ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+              <line x1="9" x2="9" y1="3" y2="21"/>
+              <path d="m16 15-3-3 3-3"/>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+              <line x1="9" x2="9" y1="3" y2="21"/>
+              <path d="m14 9 3 3-3 3"/>
+            </svg>
+          )}
+        </button>
+      </div>
+
       {/* 新建对话 */}
-      <div className="p-3">
+      <div className="px-3 pb-3">
         <button
           onClick={() => {
             createConversation();
             router.push('/chat');
           }}
-          className="w-full py-2.5 px-4 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          className={`w-full py-2.5 ${desktopSidebarOpen ? 'px-4' : 'px-0'} bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2`}
+          title={!desktopSidebarOpen ? t.chat.newChat : undefined}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          新建对话
+          {desktopSidebarOpen && <span className="whitespace-nowrap">{t.chat.newChat}</span>}
         </button>
       </div>
 
       {/* 搜索框 */}
-      <div className="px-3 pb-3">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="搜索会话..."
-          className="w-full px-3 py-2 bg-gray-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-        />
-      </div>
+      {desktopSidebarOpen && (
+        <div className="px-3 pb-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t.chat.searchPlaceholder}
+            className="w-full px-3 py-2 bg-gray-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+          />
+        </div>
+      )}
 
       {/* 会话列表 */}
       <div className="flex-1 overflow-y-auto">
-        {conversationsLoading && conversations.length === 0 ? (
-          <div className="p-4 flex items-center justify-center gap-2 text-gray-400">
-            <Spinner className="w-4 h-4" />
-            <span className="text-sm">加载中...</span>
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="p-4 text-center text-gray-400 text-sm">暂无会话</div>
-        ) : (
-          <div className="space-y-0.5 px-2">
-            {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                onClick={() => router.push(`/chat/${conv.id}`)}
-                className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-                  currentConversationId === conv.id
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <svg className="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-                <span className="flex-1 truncate text-sm">{conv.title || '新对话'}</span>
-                <button
-                  onClick={(e) => handleDelete(conv.id, e)}
-                  className={`shrink-0 p-1 rounded transition-colors text-xs ${
-                    deleteConfirmId === conv.id
-                      ? 'text-red-600 bg-red-50'
-                      : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500'
+        {desktopSidebarOpen && (
+          conversationsLoading && conversations.length === 0 ? (
+            <div className="p-4 flex items-center justify-center gap-2 text-gray-400">
+              <Spinner className="w-4 h-4" />
+              <span className="text-sm">{t.common.loading}</span>
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="p-4 text-center text-gray-400 text-sm">{t.chat.noConversations}</div>
+          ) : (
+            <div className="space-y-0.5 px-2">
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  onClick={() => router.push(`/chat/${conv.id}`)}
+                  className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                    currentConversationId === conv.id
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'hover:bg-gray-100 text-gray-700'
                   }`}
-                  title={deleteConfirmId === conv.id ? '确认删除' : '删除'}
                 >
-                  {deleteConfirmId === conv.id ? '确认?' : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
+                  <svg className="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                  <span className="flex-1 truncate text-sm">{conv.title || t.chat.newChat}</span>
+                  <button
+                    onClick={(e) => handleDelete(conv.id, e)}
+                    className={`shrink-0 p-1 rounded transition-colors text-xs ${
+                      deleteConfirmId === conv.id
+                        ? 'text-red-600 bg-red-50'
+                        : 'text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500'
+                    }`}
+                    title={deleteConfirmId === conv.id ? t.chat.confirm : t.common.delete}
+                  >
+                    {deleteConfirmId === conv.id ? t.chat.confirm : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 
       {/* 底部用户信息面板 */}
-      <UserMenu />
+      <UserMenu isCollapsed={!desktopSidebarOpen} />
     </div>
   );
 }
