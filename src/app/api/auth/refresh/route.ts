@@ -10,9 +10,12 @@ export async function POST(request: Request) {
     
     // Mock token refresh
     return NextResponse.json({
-      success: true,
-      accessToken: 'mock-access-token-refreshed-' + Date.now(),
-      refreshToken: 'mock-refresh-token-refreshed-' + Date.now(),
+      code: 200,
+      data: {
+        accessToken: 'mock-access-token-refreshed-' + Date.now(),
+        refreshToken: 'mock-refresh-token-refreshed-' + Date.now(),
+      },
+      message: 'ok',
     });
   } catch {
     return NextResponse.json({ message: 'Invalid request' }, { status: 400 });

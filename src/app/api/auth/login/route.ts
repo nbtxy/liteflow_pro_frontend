@@ -15,11 +15,12 @@ export async function POST(request: Request) {
     }
     
     return NextResponse.json({
-      success: true,
+      code: 200,
       data: {
         accessToken: 'mock-access-token-' + Date.now(),
         refreshToken: 'mock-refresh-token-' + Date.now(),
-      }
+      },
+      message: 'ok',
     });
   } catch {
     return NextResponse.json({ message: 'Invalid request' }, { status: 400 });

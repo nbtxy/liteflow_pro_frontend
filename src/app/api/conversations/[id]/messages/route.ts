@@ -9,9 +9,8 @@ export async function GET(
   const messages = mockMessages[id] || [];
 
   return NextResponse.json({
-    success: true,
-    data: {
-      items: messages,
-    }
+    code: 200,
+    data: messages,
+    message: 'ok',
   });
 }

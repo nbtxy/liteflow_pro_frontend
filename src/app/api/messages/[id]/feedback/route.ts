@@ -10,6 +10,8 @@ export async function POST(
   console.log(`Received ${type} feedback for message ${id}`);
 
   return NextResponse.json({
-    success: true,
+    code: 200,
+    data: null,
+    message: 'ok',
   });
 }

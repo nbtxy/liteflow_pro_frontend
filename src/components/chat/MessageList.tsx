@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChatStore } from '@/stores/chat';
 import { MessageContent } from './MessageContent';
+import { ToolCallCard } from './ToolCallCard';
 import { apiFetch } from '@/lib/api';
 import { toast } from '@/components/ui/Toast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -14,6 +15,9 @@ export function MessageList() {
     isStreaming,
     stopGeneration,
     regenerateLastMessage,
+    artifacts,
+    selectArtifact,
+    setArtifactPanelOpen,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -64,7 +68,6 @@ export function MessageList() {
       return;
     }
 
-    // 提交 up
     try {
       await apiFetch(`/api/messages/${messageId}/feedback`, {
         method: 'POST',
@@ -92,6 +95,12 @@ export function MessageList() {
     }
   }, [feedbackState.messageId, feedbackReason]);
 
+  // 点击 artifact 引用
+  const handleArtifactClick = useCallback((artifactId: string) => {
+    selectArtifact(artifactId);
+    setArtifactPanelOpen(true);
+  }, [selectArtifact, setArtifactPanelOpen]);
+
   if (messagesLoading) {
     return (
       <div className="flex-1 flex items-center justify-center gap-2 text-gray-400">
@@ -118,8 +127,56 @@ export function MessageList() {
                     : 'bg-blue-600 text-white'
                 }`}
               >
+                {/* 用户消息附件展示 */}
+                {!isAssistant && msg.attachments && msg.attachments.length > 0 && (
+                  <div className="mb-2 space-y-1">
+                    {msg.attachments.map(att => (
+                      <div key={att.id} className="flex items-center gap-2 text-xs bg-blue-500/30 rounded px-2 py-1">
+                        <span>📎</span>
+                        <span className="truncate">{att.name}</span>
+                        <span className="text-blue-200">{formatSize(att.size)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {isAssistant ? (
-                  <MessageContent content={msg.content} isStreaming={isStreamingThis} />
+                  <>
+                    {/* 工具调用卡片 */}
+                    {msg.toolCalls && msg.toolCalls.length > 0 && (
+                      <div className="mb-2">
+                        {msg.toolCalls.map(tc => (
+                          <ToolCallCard key={tc.toolUseId} toolCall={tc} />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 消息内容 */}
+                    {msg.content && (
+                      <MessageContent content={msg.content} isStreaming={isStreamingThis} />
+                    )}
+
+                    {/* Artifact 引用标签 */}
+                    {!isStreaming && artifacts.length > 0 && msg.content && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {artifacts
+                          .filter(a => msg.content.includes(a.title))
+                          .map(a => (
+                            <button
+                              key={a.id}
+                              onClick={() => handleArtifactClick(a.id)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                            >
+                              {a.title}
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </button>
+                          ))
+                        }
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="relative group">
                     {editingMessageId === msg.id ? (
@@ -280,4 +337,10 @@ export function MessageList() {
       )}
     </div>
   );
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

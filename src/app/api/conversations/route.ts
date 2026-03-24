@@ -8,9 +8,8 @@ export async function GET() {
   );
 
   return NextResponse.json({
-    success: true,
-    data: {
-      items: sorted,
-    }
+    code: 200,
+    data: sorted,
+    message: 'ok',
   });
 }

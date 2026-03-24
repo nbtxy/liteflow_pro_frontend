@@ -2,7 +2,7 @@ import { getAccessToken, refreshAccessToken } from './auth';
 import { toast } from '@/components/ui/Toast';
 import { getApiUrl } from './config';
 
-export async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   let token = getAccessToken();
   const url = getApiUrl(path);
 

@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     // Mock sending code
     console.log(`Sending mock code to ${phone}`);
     
-    return NextResponse.json({ success: true, message: 'Code sent successfully' });
+    return NextResponse.json({ code: 200, data: null, message: 'Code sent successfully' });
   } catch {
     return NextResponse.json({ message: 'Invalid request' }, { status: 400 });
   }

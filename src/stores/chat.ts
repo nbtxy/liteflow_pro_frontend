@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Conversation } from '@/lib/types';
+import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
 import { streamChat } from '@/lib/sse';
 import { toast } from '@/components/ui/Toast';
@@ -29,6 +29,24 @@ interface ChatStore {
   isStreaming: boolean;
   abortController: AbortController | null;
 
+  // 工具调用（当前流式消息的）
+  currentToolCalls: ToolCall[];
+
+  // Artifact
+  artifacts: Artifact[];
+  selectedArtifactId: string | null;
+
+  // 文件面板
+  artifactPanelOpen: boolean;
+  artifactPanelTab: 'artifact' | 'files';
+  files: FileItem[];
+
+  // 全局文件预览状态
+  previewFile: FileItem | null;
+
+  // 文件上传
+  pendingAttachments: FileAttachment[];
+
   // 侧边栏（移动端）
   sidebarOpen: boolean;
 
@@ -50,6 +68,26 @@ interface ChatStore {
   setSidebarOpen: (open: boolean) => void;
   toggleDesktopSidebar: () => void;
   setDesktopSidebarOpen: (open: boolean) => void;
+
+  // 工具调用
+  addToolCall: (toolCall: ToolCall) => void;
+  updateToolCall: (toolUseId: string, update: Partial<ToolCall>) => void;
+
+  // Artifact
+  addArtifact: (artifact: Artifact) => void;
+  updateArtifact: (artifactId: string, update: Partial<Artifact>) => void;
+  selectArtifact: (artifactId: string | null) => void;
+  setArtifactPanelOpen: (open: boolean) => void;
+  setArtifactPanelTab: (tab: 'artifact' | 'files') => void;
+
+  // 文件
+  loadFiles: (conversationId: string) => Promise<void>;
+  addFile: (file: FileItem) => void;
+  setPreviewFile: (file: FileItem | null) => void;
+  addPendingAttachment: (attachment: FileAttachment) => void;
+  updatePendingAttachment: (id: string, update: Partial<FileAttachment>) => void;
+  removePendingAttachment: (id: string) => void;
+  clearPendingAttachments: () => void;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -60,6 +98,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   messagesLoading: false,
   isStreaming: false,
   abortController: null,
+  currentToolCalls: [],
+  artifacts: [],
+  selectedArtifactId: null,
+  artifactPanelOpen: false,
+  artifactPanelTab: 'artifact',
+  files: [],
+  previewFile: null,
+  pendingAttachments: [],
   sidebarOpen: false,
   desktopSidebarOpen: true,
 
@@ -90,8 +136,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   selectConversation: async (id: string) => {
-    set({ currentConversationId: id, sidebarOpen: false });
+    set({
+      currentConversationId: id,
+      sidebarOpen: false,
+      artifacts: [],
+      selectedArtifactId: null,
+      files: [],
+      currentToolCalls: [],
+    });
     await get().loadMessages(id);
+    // Load files for this conversation
+    get().loadFiles(id);
   },
 
   createConversation: () => {
@@ -99,6 +154,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       currentConversationId: null,
       messages: [],
       sidebarOpen: false,
+      artifacts: [],
+      selectedArtifactId: null,
+      artifactPanelOpen: false,
+      files: [],
+      currentToolCalls: [],
+      pendingAttachments: [],
     });
   },
 
@@ -112,7 +173,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         if (updated.length > 0) {
           await get().selectConversation(updated[0].id);
         } else {
-          set({ currentConversationId: null, messages: [] });
+          set({ currentConversationId: null, messages: [], artifacts: [], files: [] });
         }
       }
       toast.success(getT().common.deleteSuccess);
@@ -135,7 +196,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   sendMessage: async (content: string) => {
-    const { currentConversationId, messages } = get();
+    const { currentConversationId, messages, pendingAttachments } = get();
+
+    // Build attachments info
+    const doneAttachments = pendingAttachments.filter(a => a.status === 'done');
 
     // 立即添加 user 消息
     const userMessage: Message = {
@@ -144,8 +208,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       role: 'user',
       content,
       createdAt: new Date().toISOString(),
+      attachments: doneAttachments.length > 0 ? doneAttachments : undefined,
     };
-    set({ messages: [...messages, userMessage], isStreaming: true });
+    set({
+      messages: [...messages, userMessage],
+      isStreaming: true,
+      currentToolCalls: [],
+      pendingAttachments: [],
+    });
 
     const abortController = new AbortController();
     set({ abortController });
@@ -160,7 +230,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             assistantMessageId = event.messageId;
             if (event.conversationId && !currentConversationId) {
               newConversationId = event.conversationId;
-              // 新会话：立即加入侧栏列表，用用户消息作临时标题
               const newConv: Conversation = {
                 id: event.conversationId,
                 title: content.slice(0, 20) || '新对话',
@@ -178,6 +247,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               role: 'assistant',
               content: '',
               createdAt: new Date().toISOString(),
+              toolCalls: [],
             };
             set((state) => ({ messages: [...state.messages, assistantMessage] }));
             break;
@@ -193,6 +263,103 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             });
             break;
           }
+          case 'tool_use_start': {
+            const toolCall: ToolCall = {
+              toolUseId: event.toolUseId,
+              toolName: event.toolName,
+              status: 'running',
+              startedAt: Date.now(),
+            };
+            set((state) => {
+              const toolCalls = [...state.currentToolCalls, toolCall];
+              // Also attach to last assistant message
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                msgs[msgs.length - 1] = { ...last, toolCalls: [...(last.toolCalls || []), toolCall] };
+              }
+              return { currentToolCalls: toolCalls, messages: msgs };
+            });
+            break;
+          }
+          case 'tool_use_input': {
+            set((state) => {
+              const toolCalls = state.currentToolCalls.map(tc =>
+                tc.toolUseId === event.toolUseId ? { ...tc, input: event.input } : tc
+              );
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const updatedToolCalls = (last.toolCalls || []).map(tc =>
+                  tc.toolUseId === event.toolUseId ? { ...tc, input: event.input } : tc
+                );
+                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls };
+              }
+              return { currentToolCalls: toolCalls, messages: msgs };
+            });
+            break;
+          }
+          case 'tool_result': {
+            const now = Date.now();
+            set((state) => {
+              const toolCalls = state.currentToolCalls.map(tc =>
+                tc.toolUseId === event.toolUseId
+                  ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
+                  : tc
+              );
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const updatedToolCalls = (last.toolCalls || []).map(tc =>
+                  tc.toolUseId === event.toolUseId
+                    ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
+                    : tc
+                );
+                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls };
+              }
+              return { currentToolCalls: toolCalls, messages: msgs };
+            });
+            break;
+          }
+          case 'artifact_created': {
+            const artifact: Artifact = {
+              id: event.artifactId,
+              type: event.artifactType,
+              title: event.title,
+              language: event.language,
+              content: event.content,
+              url: event.url,
+              version: event.version,
+              versions: [event.version],
+              conversationId: newConversationId ?? '',
+              createdAt: new Date().toISOString(),
+            };
+            set((state) => ({
+              artifacts: [...state.artifacts, artifact],
+              selectedArtifactId: artifact.id,
+              artifactPanelOpen: true,
+              artifactPanelTab: 'artifact',
+            }));
+            break;
+          }
+          case 'artifact_updated': {
+            set((state) => ({
+              artifacts: state.artifacts.map(a =>
+                a.id === event.artifactId
+                  ? {
+                      ...a,
+                      version: event.version,
+                      content: event.content ?? a.content,
+                      url: event.url ?? a.url,
+                      versions: [...(a.versions || []), event.version],
+                    }
+                  : a
+              ),
+              selectedArtifactId: event.artifactId,
+              artifactPanelOpen: true,
+            }));
+            break;
+          }
           case 'stream_end': {
             break;
           }
@@ -201,10 +368,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
-                // 已有 assistant 消息，追加错误到内容中
                 msgs[msgs.length - 1] = { ...last, content: last.content + `\n\n⚠️ ${event.message}` };
               } else {
-                // stream_start 之前就出错了，创建一条 assistant 错误消息
                 msgs.push({
                   id: `error-${Date.now()}`,
                   conversationId: newConversationId ?? '',
@@ -224,10 +389,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         toast.error(getT().chat.sendMessageFailed);
       }
     } finally {
-      set({ isStreaming: false, abortController: null });
-      // 立即刷新一次会话列表
+      set({ isStreaming: false, abortController: null, currentToolCalls: [] });
       get().loadConversations();
-      // 延迟再刷新一次，等待后端异步生成标题
       setTimeout(() => get().loadConversations(), 2000);
     }
   },
@@ -235,24 +398,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   stopGeneration: () => {
     const { abortController } = get();
     abortController?.abort();
-    set({ isStreaming: false, abortController: null });
+    set({ isStreaming: false, abortController: null, currentToolCalls: [] });
   },
 
   regenerateLastMessage: async () => {
     const { messages, currentConversationId } = get();
     if (!currentConversationId || messages.length < 2) return;
 
-    // 找到最后一条 user 消息的内容
     const newMessages = [...messages];
-    // 移除最后一条 assistant 消息
     if (newMessages[newMessages.length - 1]?.role === 'assistant') {
       newMessages.pop();
     }
     const lastUser = newMessages[newMessages.length - 1];
     if (!lastUser || lastUser.role !== 'user') return;
 
-    // 只移除旧的 assistant 回复，不重新插入 user 消息
-    set({ messages: newMessages, isStreaming: true });
+    set({ messages: newMessages, isStreaming: true, currentToolCalls: [] });
 
     const abortController = new AbortController();
     set({ abortController });
@@ -267,6 +427,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               role: 'assistant',
               content: '',
               createdAt: new Date().toISOString(),
+              toolCalls: [],
             };
             set((state) => ({ messages: [...state.messages, assistantMessage] }));
             break;
@@ -280,6 +441,101 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               }
               return { messages: msgs };
             });
+            break;
+          }
+          case 'tool_use_start': {
+            const toolCall: ToolCall = {
+              toolUseId: event.toolUseId,
+              toolName: event.toolName,
+              status: 'running',
+              startedAt: Date.now(),
+            };
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                msgs[msgs.length - 1] = { ...last, toolCalls: [...(last.toolCalls || []), toolCall] };
+              }
+              return { currentToolCalls: [...state.currentToolCalls, toolCall], messages: msgs };
+            });
+            break;
+          }
+          case 'tool_use_input': {
+            set((state) => {
+              const toolCalls = state.currentToolCalls.map(tc =>
+                tc.toolUseId === event.toolUseId ? { ...tc, input: event.input } : tc
+              );
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const updatedToolCalls = (last.toolCalls || []).map(tc =>
+                  tc.toolUseId === event.toolUseId ? { ...tc, input: event.input } : tc
+                );
+                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls };
+              }
+              return { currentToolCalls: toolCalls, messages: msgs };
+            });
+            break;
+          }
+          case 'tool_result': {
+            const now = Date.now();
+            set((state) => {
+              const toolCalls = state.currentToolCalls.map(tc =>
+                tc.toolUseId === event.toolUseId
+                  ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
+                  : tc
+              );
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const updatedToolCalls = (last.toolCalls || []).map(tc =>
+                  tc.toolUseId === event.toolUseId
+                    ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
+                    : tc
+                );
+                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls };
+              }
+              return { currentToolCalls: toolCalls, messages: msgs };
+            });
+            break;
+          }
+          case 'artifact_created': {
+            const artifact: Artifact = {
+              id: event.artifactId,
+              type: event.artifactType,
+              title: event.title,
+              language: event.language,
+              content: event.content,
+              url: event.url,
+              version: event.version,
+              versions: [event.version],
+              conversationId: currentConversationId,
+              createdAt: new Date().toISOString(),
+            };
+            set((state) => ({
+              artifacts: [...state.artifacts, artifact],
+              selectedArtifactId: artifact.id,
+              artifactPanelOpen: true,
+              artifactPanelTab: 'artifact',
+            }));
+            break;
+          }
+          case 'artifact_updated': {
+            set((state) => ({
+              artifacts: state.artifacts.map(a =>
+                a.id === event.artifactId
+                  ? {
+                      ...a,
+                      version: event.version,
+                      content: event.content ?? a.content,
+                      url: event.url ?? a.url,
+                      versions: [...(a.versions || []), event.version],
+                    }
+                  : a
+              ),
+              selectedArtifactId: event.artifactId,
+              artifactPanelOpen: true,
+            }));
             break;
           }
           case 'stream_end':
@@ -310,7 +566,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         toast.error(getT().chat.sendMessageFailed);
       }
     } finally {
-      set({ isStreaming: false, abortController: null });
+      set({ isStreaming: false, abortController: null, currentToolCalls: [] });
     }
   },
 
@@ -321,11 +577,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const targetIndex = messages.findIndex((m) => m.id === messageId);
     if (targetIndex === -1) return;
 
-    // 截断历史：保留目标消息之前的所有消息
     const newMessages = messages.slice(0, targetIndex);
     set({ messages: newMessages });
 
-    // 用新内容重新发送
     await get().sendMessage(newContent);
   },
 
@@ -333,4 +587,71 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
   toggleDesktopSidebar: () => set((state) => ({ desktopSidebarOpen: !state.desktopSidebarOpen })),
   setDesktopSidebarOpen: (open: boolean) => set({ desktopSidebarOpen: open }),
+
+  // 工具调用
+  addToolCall: (toolCall: ToolCall) => {
+    set((state) => ({ currentToolCalls: [...state.currentToolCalls, toolCall] }));
+  },
+  updateToolCall: (toolUseId: string, update: Partial<ToolCall>) => {
+    set((state) => ({
+      currentToolCalls: state.currentToolCalls.map(tc =>
+        tc.toolUseId === toolUseId ? { ...tc, ...update } : tc
+      ),
+    }));
+  },
+
+  // Artifact
+  addArtifact: (artifact: Artifact) => {
+    set((state) => ({
+      artifacts: [...state.artifacts, artifact],
+      selectedArtifactId: artifact.id,
+      artifactPanelOpen: true,
+    }));
+  },
+  updateArtifact: (artifactId: string, update: Partial<Artifact>) => {
+    set((state) => ({
+      artifacts: state.artifacts.map(a =>
+        a.id === artifactId ? { ...a, ...update } : a
+      ),
+    }));
+  },
+  selectArtifact: (artifactId: string | null) => {
+    set({ selectedArtifactId: artifactId, artifactPanelTab: 'artifact' });
+    if (artifactId) {
+      set({ artifactPanelOpen: true });
+    }
+  },
+  setArtifactPanelOpen: (open: boolean) => set({ artifactPanelOpen: open }),
+  setArtifactPanelTab: (tab: 'artifact' | 'files') => set({ artifactPanelTab: tab }),
+
+  // 文件
+  loadFiles: async (conversationId: string) => {
+    try {
+      const data = await apiFetch(`/api/conversations/${conversationId}/files`);
+      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      set({ files: list });
+    } catch {
+      // silently fail
+    }
+  },
+  addFile: (file: FileItem) => {
+    set((state) => ({ files: [...state.files, file] }));
+  },
+  setPreviewFile: (file: FileItem | null) => set({ previewFile: file }),
+  addPendingAttachment: (attachment: FileAttachment) => {
+    set((state) => ({ pendingAttachments: [...state.pendingAttachments, attachment] }));
+  },
+  updatePendingAttachment: (id: string, update: Partial<FileAttachment>) => {
+    set((state) => ({
+      pendingAttachments: state.pendingAttachments.map(a =>
+        a.id === id ? { ...a, ...update } : a
+      ),
+    }));
+  },
+  removePendingAttachment: (id: string) => {
+    set((state) => ({
+      pendingAttachments: state.pendingAttachments.filter(a => a.id !== id),
+    }));
+  },
+  clearPendingAttachments: () => set({ pendingAttachments: [] }),
 }));

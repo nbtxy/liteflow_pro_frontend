@@ -9,6 +9,8 @@ export async function DELETE(
   deleteConversation(id);
   
   return NextResponse.json({
-    success: true,
+    code: 200,
+    data: null,
+    message: 'ok',
   });
 }
