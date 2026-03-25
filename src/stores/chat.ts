@@ -83,6 +83,8 @@ interface ChatStore {
   // 文件
   loadFiles: (conversationId: string) => Promise<void>;
   addFile: (file: FileItem) => void;
+  removeFile: (index: number) => void;
+  removeArtifact: (artifactId: string) => void;
   setPreviewFile: (file: FileItem | null) => void;
   addPendingAttachment: (attachment: FileAttachment) => void;
   updatePendingAttachment: (id: string, update: Partial<FileAttachment>) => void;
@@ -636,6 +638,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   addFile: (file: FileItem) => {
     set((state) => ({ files: [...state.files, file] }));
+  },
+  removeFile: (index: number) => {
+    set((state) => ({ files: state.files.filter((_, i) => i !== index) }));
+  },
+  removeArtifact: (artifactId: string) => {
+    set((state) => ({
+      artifacts: state.artifacts.filter(a => a.id !== artifactId),
+      selectedArtifactId: state.selectedArtifactId === artifactId ? null : state.selectedArtifactId,
+    }));
   },
   setPreviewFile: (file: FileItem | null) => set({ previewFile: file }),
   addPendingAttachment: (attachment: FileAttachment) => {
