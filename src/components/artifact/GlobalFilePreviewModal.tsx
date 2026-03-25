@@ -1,23 +1,22 @@
 'use client';
 
+import React from 'react';
 import { useChatStore } from '@/stores/chat';
 import type { FileItem, Artifact } from '@/lib/types';
 import { useLanguage } from '@/lib/i18n/context';
 import { translations } from '@/lib/i18n/translations';
+import { downloadFileWithAuth, fetchFileContent, fetchFileBlobUrl } from '@/lib/fileUtils';
+import { toast } from '@/components/ui/Toast';
 
 export function GlobalFilePreviewModal() {
-  const { previewFile, setPreviewFile, artifacts } = useChatStore();
+  const { previewFile, setPreviewFile, artifacts, currentConversationId } = useChatStore();
   const { t } = useLanguage();
 
   if (!previewFile) return null;
 
-  const handleDownload = () => {
-    if (previewFile.url) {
-      const a = document.createElement('a');
-      a.href = previewFile.url;
-      a.download = previewFile.name;
-      a.click();
-    } else if (previewFile.artifactId) {
+  const handleDownload = async () => {
+    // 优先用 artifact 内存内容
+    if (previewFile.artifactId) {
       const artifact = artifacts.find(a => a.id === previewFile.artifactId);
       if (artifact?.content) {
         const blob = new Blob([artifact.content], { type: 'text/plain' });
@@ -27,13 +26,24 @@ export function GlobalFilePreviewModal() {
         a.download = previewFile.name;
         a.click();
         URL.revokeObjectURL(url);
+        return;
+      }
+    }
+
+    // 从后端下载（带认证）
+    const filePath = previewFile.path || previewFile.name;
+    if (currentConversationId && filePath) {
+      try {
+        await downloadFileWithAuth(currentConversationId, filePath, previewFile.name);
+      } catch {
+        toast.error('Download failed');
       }
     }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all" onClick={() => setPreviewFile(null)}>
-      <div 
+      <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
@@ -71,7 +81,7 @@ export function GlobalFilePreviewModal() {
 
         {/* Modal Content */}
         <div className="flex-1 overflow-auto bg-gray-50/50 relative">
-          <FilePreviewContent file={previewFile} artifacts={artifacts} t={t} />
+          <FilePreviewContent file={previewFile} artifacts={artifacts} conversationId={currentConversationId} t={t} />
         </div>
       </div>
     </div>
@@ -90,56 +100,37 @@ function getFileIcon(type: string): string {
   }
 }
 
-function FilePreviewContent({ file, artifacts, t }: { file: FileItem; artifacts: Artifact[]; t: typeof translations.en }) {
-  if (file.url) {
-    if (file.type === 'IMAGE' || file.name.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
-      return (
-        <div className="flex items-center justify-center min-h-full p-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={file.url} alt={file.name} className="max-w-full max-h-full object-contain rounded-lg shadow-sm border border-gray-200/50 bg-white" />
-        </div>
-      );
-    }
-    return (
-      <div className="flex flex-col items-center justify-center min-h-full text-gray-500 gap-4">
-        <span className="text-7xl opacity-50">{getFileIcon(file.type)}</span>
-        <p className="text-lg">{t.chat.workspace.previewNotSupported}</p>
-        <p className="text-sm text-gray-400">{t.chat.workspace.downloadToView}</p>
-      </div>
-    );
-  }
-
+function FilePreviewContent({ file, artifacts, conversationId, t }: { file: FileItem; artifacts: Artifact[]; conversationId: string | null; t: typeof translations.en }) {
+  // 优先用 artifact 内存内容
   if (file.artifactId) {
     const artifact = artifacts.find(a => a.id === file.artifactId);
-    if (!artifact) return <div className="text-center text-gray-500 py-12">{t.chat.workspace.contentLost}</div>;
-
-    if (file.type === 'CODE' || file.type === 'MARKDOWN') {
-      return (
-        <div className="p-6 h-full">
-          <pre className="h-full p-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-auto text-sm font-mono text-gray-800 m-0">
-            <code>{artifact.content}</code>
-          </pre>
-        </div>
-      );
-    }
-
-    if (file.type === 'HTML') {
-      return (
-        <div className="p-6 h-full">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full overflow-hidden">
-            <iframe
-              srcDoc={artifact.content || ''}
-              sandbox="allow-scripts"
-              className="w-full h-full border-none bg-white"
-              title={artifact.title}
-            />
+    if (artifact?.content) {
+      if (file.type === 'CODE' || file.type === 'MARKDOWN' || file.type === 'DATA') {
+        return (
+          <div className="p-6 h-full">
+            <pre className="h-full p-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-auto text-sm font-mono text-gray-800 m-0">
+              <code>{artifact.content}</code>
+            </pre>
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    if (file.type === 'SVG' || file.type === 'IMAGE') {
-      if (artifact.content?.trim().startsWith('<svg')) {
+      if (file.type === 'HTML') {
+        return (
+          <div className="p-6 h-full">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full overflow-hidden">
+              <iframe
+                srcDoc={artifact.content || ''}
+                sandbox="allow-scripts"
+                className="w-full h-full border-none bg-white"
+                title={artifact.title}
+              />
+            </div>
+          </div>
+        );
+      }
+
+      if ((file.type === 'SVG' || file.type === 'IMAGE') && artifact.content?.trim().startsWith('<svg')) {
         return (
           <div className="flex items-center justify-center min-h-full p-8">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 max-w-full max-h-full flex items-center justify-center overflow-auto">
@@ -151,11 +142,129 @@ function FilePreviewContent({ file, artifacts, t }: { file: FileItem; artifacts:
     }
   }
 
+  // 从后端获取文件内容预览
+  const filePath = file.path || file.name;
+  if (conversationId && filePath) {
+    // 图片预览
+    if (file.type === 'IMAGE' || file.name.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+      return <RemoteBlobPreview conversationId={conversationId} filePath={filePath} fileName={file.name} type="image" t={t} />;
+    }
+
+    // PDF 预览
+    if (file.name.match(/\.pdf$/i)) {
+      return <RemoteBlobPreview conversationId={conversationId} filePath={filePath} fileName={file.name} type="pdf" t={t} />;
+    }
+
+    // 文本类文件预览
+    if (file.name.match(/\.(txt|md|json|csv|xml|yaml|yml|log|js|ts|tsx|jsx|py|java|go|rs|c|cpp|h|css|html|sql|sh|bat)$/i)) {
+      return <RemoteTextPreview conversationId={conversationId} filePath={filePath} t={t} />;
+    }
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-full text-gray-500 gap-4">
       <span className="text-7xl opacity-50">{getFileIcon(file.type)}</span>
       <p className="text-lg">{t.chat.workspace.previewNotSupported}</p>
       <p className="text-sm text-gray-400">{t.chat.workspace.downloadToView}</p>
+    </div>
+  );
+}
+
+// 远程二进制文件预览（图片/PDF）
+function RemoteBlobPreview({ conversationId, filePath, fileName, type, t }: {
+  conversationId: string; filePath: string; fileName: string; type: 'image' | 'pdf'; t: typeof translations.en;
+}) {
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
+
+  React.useEffect(() => {
+    fetchFileBlobUrl(conversationId, filePath)
+      .then(url => {
+        setBlobUrl(url);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
+
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, filePath]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-full text-gray-400">{t.common.loading}</div>;
+  }
+
+  if (error || !blobUrl) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-full text-gray-500 gap-4">
+        <span className="text-7xl opacity-50">{getFileIcon('FILE')}</span>
+        <p className="text-lg">{t.chat.workspace.previewNotSupported}</p>
+        <p className="text-sm text-gray-400">{t.chat.workspace.downloadToView}</p>
+      </div>
+    );
+  }
+
+  if (type === 'image') {
+    return (
+      <div className="flex items-center justify-center min-h-full p-8">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={blobUrl} alt={fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-sm border border-gray-200/50 bg-white" />
+      </div>
+    );
+  }
+
+  // PDF
+  return (
+    <div className="p-6 h-full">
+      <iframe src={blobUrl} className="w-full h-full border-none bg-white rounded-xl shadow-sm" title={fileName} />
+    </div>
+  );
+}
+
+// 远程文本文件预览
+function RemoteTextPreview({ conversationId, filePath, t }: {
+  conversationId: string; filePath: string; t: typeof translations.en;
+}) {
+  const [content, setContent] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
+
+  React.useEffect(() => {
+    fetchFileContent(conversationId, filePath)
+      .then(text => {
+        setContent(text);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
+  }, [conversationId, filePath]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-full text-gray-400">{t.common.loading}</div>;
+  }
+
+  if (error || content === null) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-full text-gray-500 gap-4">
+        <span className="text-7xl opacity-50">{getFileIcon('CODE')}</span>
+        <p className="text-lg">{t.chat.workspace.previewNotSupported}</p>
+        <p className="text-sm text-gray-400">{t.chat.workspace.downloadToView}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 h-full">
+      <pre className="h-full p-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-auto text-sm font-mono text-gray-800 m-0">
+        <code>{content}</code>
+      </pre>
     </div>
   );
 }
