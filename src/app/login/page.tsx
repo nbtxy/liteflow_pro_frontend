@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { setTokens } from '@/lib/auth';
 import { getApiUrl } from '@/lib/config';
@@ -9,12 +9,24 @@ import { useLanguage } from '@/lib/i18n/context';
 export default function LoginPage() {
   const router = useRouter();
   const { locale, setLocale, t } = useLanguage();
-  const toggleLanguage = () => setLocale(locale === 'zh' ? 'en' : 'zh');
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // 点击外部关闭语言面板
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // 倒计时
   useEffect(() => {
@@ -80,17 +92,38 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
-      {/* 语言切换按钮 */}
-      <div className="absolute top-4 right-4">
+      {/* 语言切换 */}
+      <div className="absolute top-4 right-4" ref={langRef}>
         <button
-          onClick={toggleLanguage}
+          onClick={() => setLangOpen(!langOpen)}
           className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
           </svg>
-          {locale === 'zh' ? 'English' : '中文'}
+          {locale === 'zh' ? '中文' : 'English'}
+          <svg className={`w-3 h-3 transition-transform ${langOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
+        {langOpen && (
+          <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
+            <button
+              onClick={() => { setLocale('zh'); setLangOpen(false); }}
+              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${locale === 'zh' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              中文
+              {locale === 'zh' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+            </button>
+            <button
+              onClick={() => { setLocale('en'); setLangOpen(false); }}
+              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${locale === 'en' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              English
+              {locale === 'en' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-lg">

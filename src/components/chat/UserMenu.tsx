@@ -11,7 +11,7 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { locale, setLocale, t } = useLanguage();
-  const toggleLanguage = () => setLocale(locale === 'zh' ? 'en' : 'zh');
+  const [langSubOpen, setLangSubOpen] = useState(false);
 
   // Mock user data
   const user = {
@@ -49,10 +49,7 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
           
           <div className="py-1 border-b border-gray-100">
             <button
-              onClick={() => {
-                toggleLanguage();
-                setIsOpen(false);
-              }}
+              onClick={() => setLangSubOpen(!langSubOpen)}
               className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition-colors"
             >
               <div className="flex items-center gap-2">
@@ -61,10 +58,33 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
                 </svg>
                 {t.common.language}
               </div>
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                {locale === 'zh' ? '中文' : 'EN'}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                  {locale === 'zh' ? '中文' : 'EN'}
+                </span>
+                <svg className={`w-3 h-3 text-gray-400 transition-transform ${langSubOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
             </button>
+            {langSubOpen && (
+              <div className="border-t border-gray-100 bg-gray-50/50">
+                <button
+                  onClick={() => { setLocale('zh'); setLangSubOpen(false); setIsOpen(false); }}
+                  className={`w-full text-left px-8 py-2 text-sm flex items-center justify-between transition-colors ${locale === 'zh' ? 'text-blue-600 font-medium bg-blue-50/50' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  中文
+                  {locale === 'zh' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                </button>
+                <button
+                  onClick={() => { setLocale('en'); setLangSubOpen(false); setIsOpen(false); }}
+                  className={`w-full text-left px-8 py-2 text-sm flex items-center justify-between transition-colors ${locale === 'en' ? 'text-blue-600 font-medium bg-blue-50/50' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  English
+                  {locale === 'en' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="py-1">
