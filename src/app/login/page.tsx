@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [agreed, setAgreed] = useState(false);
 
   // 点击外部关闭语言面板
   useEffect(() => {
@@ -62,6 +63,10 @@ export default function LoginPage() {
 
   const handleLogin = useCallback(async () => {
     if (!phone.trim() || !code.trim()) return;
+    if (!agreed) {
+      setError(t.login.agreeFirst);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -88,7 +93,7 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }, [phone, code, router, t]);
+  }, [phone, code, agreed, router, t]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
@@ -137,57 +142,67 @@ export default function LoginPage() {
 
         <div className="space-y-4">
           {/* 手机号 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.login.phoneLabel}
-            </label>
+          <div className="flex items-center bg-gray-100 rounded-xl overflow-hidden">
+            <span className="pl-4 pr-3 text-gray-900 font-medium text-base shrink-0">+86</span>
+            <div className="w-px h-6 bg-gray-300" />
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder={t.login.phonePlaceholder}
               maxLength={11}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900 placeholder-gray-400"
+              className="flex-1 px-3 py-3.5 bg-transparent outline-none text-gray-900 placeholder-gray-400 text-base"
             />
           </div>
 
           {/* 验证码 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.login.codeLabel}
-            </label>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder={t.login.codePlaceholder}
-                maxLength={6}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900 placeholder-gray-400"
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              />
-              <button
-                onClick={sendCode}
-                disabled={countdown > 0 || !phone.trim()}
-                className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
-              >
-                {countdown > 0 
-                  ? `${countdown}s` 
-                  : t.login.sendCode}
-              </button>
-            </div>
+          <div className="flex items-center bg-gray-100 rounded-xl overflow-hidden">
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={t.login.codeLabel}
+              maxLength={6}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              className="flex-1 px-4 py-3.5 bg-transparent outline-none text-gray-900 placeholder-gray-400 text-base"
+            />
+            <div className="w-[1.5px] h-6 bg-gray-300 shrink-0" />
+            <button
+              onClick={sendCode}
+              disabled={countdown > 0 || !phone.trim()}
+              className="pr-2 w-[100px] text-center text-blue-600 font-medium text-sm whitespace-nowrap disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0"
+            >
+              {countdown > 0 ? `${countdown}s` : t.login.sendCode}
+            </button>
           </div>
 
           {/* 登录按钮 */}
           <button
             onClick={handleLogin}
             disabled={loading || !phone.trim() || !code.trim()}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-medium text-base hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading 
-              ? t.login.submitting 
-              : t.login.submit}
+            {loading ? t.login.submitting : t.login.submit}
           </button>
+
+          {/* 协议 */}
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <button
+              onClick={() => setAgreed(!agreed)}
+              className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
+                agreed ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'
+              }`}
+            >
+              {agreed && (
+                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+            <span className="text-sm text-gray-500">
+              {t.login.agreement}<a href="#" className="text-blue-600">{t.login.terms}</a>{t.login.and}<a href="#" className="text-blue-600">{t.login.privacy}</a>
+            </span>
+          </div>
         </div>
       </div>
     </div>

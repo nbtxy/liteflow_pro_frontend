@@ -90,14 +90,26 @@ export default function ChatLayout({
           </div>
         )}
 
-        {/* 顶部栏（移动端汉堡菜单） */}
-        <header className="flex items-center px-4 py-3 border-b border-gray-200 bg-white md:hidden">
-          <button onClick={toggleSidebar} className="p-1 text-gray-600 hover:text-gray-900">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        {/* 顶部栏（移动端汉堡菜单 + 右侧面板入口） */}
+        <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white md:hidden">
+          <div className="flex items-center">
+            <button onClick={toggleSidebar} className="p-1 text-gray-600 hover:text-gray-900">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="ml-3 text-lg font-semibold text-gray-900">LiteFlow</h1>
+          </div>
+          <button
+            onClick={() => setArtifactPanelOpen(!artifactPanelOpen)}
+            className="p-1 text-gray-600 hover:text-gray-900"
+            title={artifactPanelOpen ? t.chat.workspace.close : t.chat.workspace.open}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+              <line x1="15" x2="15" y1="3" y2="21"/>
             </svg>
           </button>
-          <h1 className="ml-3 text-lg font-semibold text-gray-900">LiteFlow</h1>
         </header>
 
         {children}
