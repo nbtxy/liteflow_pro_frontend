@@ -7,6 +7,7 @@ import { ConversationList } from '@/components/chat/ConversationList';
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel';
 import { GlobalFilePreviewModal } from '@/components/artifact/GlobalFilePreviewModal';
 import { useLanguage } from '@/lib/i18n/context';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export default function ChatLayout({
   children,
@@ -51,6 +52,7 @@ export default function ChatLayout({
   }, [desktopSidebarOpen]);
 
   return (
+    <AuthGuard>
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* 移动端遮罩 */}
       {sidebarOpen && (
@@ -107,5 +109,6 @@ export default function ChatLayout({
       {/* 全局文件预览弹窗 */}
       <GlobalFilePreviewModal />
     </div>
+    </AuthGuard>
   );
 }

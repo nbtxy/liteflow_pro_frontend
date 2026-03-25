@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-import { AuthGuard } from "@/components/auth/AuthGuard";
 import { LanguageProvider } from "@/lib/i18n/context";
 
 const geistSans = Geist({
@@ -32,7 +31,7 @@ export default function RootLayout({
     >
       <body className="h-full">
         <LanguageProvider>
-          <AuthGuard>{children}</AuthGuard>
+          {children}
           <ToastProvider />
         </LanguageProvider>
       </body>
