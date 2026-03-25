@@ -19,7 +19,7 @@ export function ToolCallCard({ toolCall }: Props) {
   const isRunning = toolCall.status === 'running';
   const isError = toolCall.status === 'error';
   const statusIcon = isRunning ? (
-    <span className="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+    <span className="inline-block w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
   ) : isError ? (
     <span className="text-red-500 text-sm">✕</span>
   ) : (
@@ -38,7 +38,7 @@ export function ToolCallCard({ toolCall }: Props) {
     <div
       className={`my-2 rounded-lg border transition-colors cursor-pointer ${
         isRunning
-          ? 'border-blue-200 bg-blue-50/50'
+          ? 'border-teal-200 bg-teal-50/50'
           : isError
           ? 'border-red-200 bg-red-50/50'
           : 'border-gray-200 bg-gray-50/50'

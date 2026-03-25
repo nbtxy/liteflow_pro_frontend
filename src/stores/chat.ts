@@ -59,6 +59,8 @@ interface ChatStore {
   selectConversation: (id: string) => Promise<void>;
   createConversation: () => void;
   deleteConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
+  archiveConversation: (id: string) => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   stopGeneration: () => void;
@@ -181,6 +183,44 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       toast.success(getT().common.deleteSuccess);
     } catch {
       toast.error(getT().chat.deleteConversationFailed);
+    }
+  },
+
+  renameConversation: async (id: string, title: string) => {
+    try {
+      await apiFetch(`/api/conversations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+      const { conversations } = get();
+      set({
+        conversations: conversations.map((c) =>
+          c.id === id ? { ...c, title } : c
+        ),
+      });
+      toast.success(getT().chat.renameSuccess);
+    } catch {
+      toast.error(getT().chat.renameConversationFailed);
+    }
+  },
+
+  archiveConversation: async (id: string) => {
+    try {
+      await apiFetch(`/api/conversations/${id}/archive`, { method: 'POST' });
+      const { conversations, currentConversationId } = get();
+      const updated = conversations.filter((c) => c.id !== id);
+      set({ conversations: updated });
+      if (currentConversationId === id) {
+        if (updated.length > 0) {
+          await get().selectConversation(updated[0].id);
+        } else {
+          set({ currentConversationId: null, messages: [], artifacts: [], files: [] });
+        }
+      }
+      toast.success(getT().chat.archiveSuccess);
+    } catch {
+      toast.error(getT().chat.archiveConversationFailed);
     }
   },
 

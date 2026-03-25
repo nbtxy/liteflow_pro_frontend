@@ -121,20 +121,20 @@ export function MessageList() {
           return (
             <div key={msg.id} className={`flex ${isAssistant ? 'justify-start' : 'justify-end'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                className={`relative group max-w-[85%] ${
                   isAssistant
-                    ? 'bg-white border border-gray-200 text-gray-800'
-                    : 'bg-blue-600 text-white'
+                    ? 'px-2 pb-8 text-gray-800'
+                    : 'rounded-2xl px-4 py-3 bg-teal-600 text-white'
                 }`}
               >
                 {/* 用户消息附件展示 */}
                 {!isAssistant && msg.attachments && msg.attachments.length > 0 && (
                   <div className="mb-2 space-y-1">
                     {msg.attachments.map(att => (
-                      <div key={att.id} className="flex items-center gap-2 text-xs bg-blue-500/30 rounded px-2 py-1">
+                      <div key={att.id} className="flex items-center gap-2 text-xs bg-teal-500/30 rounded px-2 py-1">
                         <span>📎</span>
                         <span className="truncate">{att.name}</span>
-                        <span className="text-blue-200">{formatSize(att.size)}</span>
+                        <span className="text-teal-200">{formatSize(att.size)}</span>
                       </div>
                     ))}
                   </div>
@@ -165,7 +165,7 @@ export function MessageList() {
                             <button
                               key={a.id}
                               onClick={() => handleArtifactClick(a.id)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-teal-50 text-teal-600 rounded hover:bg-teal-100 transition-colors"
                             >
                               {a.title}
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,14 +184,14 @@ export function MessageList() {
                         <textarea
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
-                          className="w-full bg-blue-700 text-white border border-blue-500 rounded p-2 text-sm outline-none resize-none"
+                          className="w-full bg-teal-700 text-white border border-teal-500 rounded p-2 text-sm outline-none resize-none"
                           rows={Math.max(3, editContent.split('\n').length)}
                           autoFocus
                         />
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => setEditingMessageId(null)}
-                            className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-400 rounded transition-colors"
+                            className="px-3 py-1 text-xs bg-teal-500 hover:bg-teal-400 rounded transition-colors"
                           >
                             取消
                           </button>
@@ -202,7 +202,7 @@ export function MessageList() {
                               }
                               setEditingMessageId(null);
                             }}
-                            className="px-3 py-1 text-xs bg-white text-blue-600 hover:bg-gray-100 rounded transition-colors"
+                            className="px-3 py-1 text-xs bg-white text-teal-600 hover:bg-gray-100 rounded transition-colors"
                           >
                             发送
                           </button>
@@ -217,7 +217,7 @@ export function MessageList() {
                               setEditingMessageId(msg.id);
                               setEditContent(msg.content);
                             }}
-                            className="absolute -left-8 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -left-12 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
                             title="编辑"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,7 +232,7 @@ export function MessageList() {
 
                 {/* Assistant 消息操作栏 */}
                 {isAssistant && !isStreaming && msg.content && (
-                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                  <div className={`absolute left-1 flex items-center gap-2 ${isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
                       onClick={() => handleFeedback(msg.id, 'up')}
                       className={`p-1 transition-colors ${
@@ -261,7 +261,7 @@ export function MessageList() {
                     </button>
                     <button
                       onClick={() => navigator.clipboard.writeText(msg.content)}
-                      className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                      className="p-1 text-gray-400 hover:text-teal-500 transition-colors"
                       title="复制"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,7 +271,7 @@ export function MessageList() {
                     {isLast && (
                       <button
                         onClick={regenerateLastMessage}
-                        className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                        className="p-1 text-gray-400 hover:text-teal-500 transition-colors"
                         title="重新生成"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -313,7 +313,7 @@ export function MessageList() {
               value={feedbackReason}
               onChange={(e) => setFeedbackReason(e.target.value)}
               placeholder="请输入反馈原因（可选）..."
-              className="w-full h-32 p-3 text-sm border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+              className="w-full h-32 p-3 text-sm border border-gray-200 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none"
             />
             <div className="flex justify-end gap-3 pt-2">
               <button
@@ -327,7 +327,7 @@ export function MessageList() {
               </button>
               <button
                 onClick={submitDislikeFeedback}
-                className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors"
               >
                 提交
               </button>

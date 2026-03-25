@@ -24,6 +24,7 @@ export function ChatInput() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
 
   // 自动调整高度
   useEffect(() => {
@@ -43,11 +44,16 @@ export function ChatInput() {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
+        const native = e.nativeEvent as unknown as { isComposing?: boolean; keyCode?: number };
+        const composing = isComposing || !!native?.isComposing || native?.keyCode === 229;
+        if (composing) {
+          return;
+        }
         e.preventDefault();
         handleSend();
       }
     },
-    [handleSend]
+    [handleSend, isComposing]
   );
 
   // 文件上传逻辑
@@ -169,12 +175,12 @@ export function ChatInput() {
     >
       <div className="max-w-3xl mx-auto">
         <div className={`relative flex flex-col bg-white border rounded-2xl shadow-sm focus-within:border-gray-300 focus-within:shadow-md transition-all duration-200 ${
-          isDragging ? 'border-blue-400 bg-blue-50/30 shadow-md' : 'border-gray-200'
+          isDragging ? 'border-teal-400 bg-teal-50/30 shadow-md' : 'border-gray-200'
         }`}>
           {/* 拖拽提示 */}
           {isDragging && (
-            <div className="absolute inset-0 flex items-center justify-center bg-blue-50/80 rounded-2xl z-10 pointer-events-none">
-              <div className="text-blue-500 text-sm font-medium">释放文件以上传</div>
+            <div className="absolute inset-0 flex items-center justify-center bg-teal-50/80 rounded-2xl z-10 pointer-events-none">
+              <div className="text-teal-500 text-sm font-medium">释放文件以上传</div>
             </div>
           )}
 
@@ -196,7 +202,7 @@ export function ChatInput() {
                   <span className="truncate max-w-[120px]">{att.name}</span>
                   <span className="text-gray-400">({formatSize(att.size)})</span>
                   {att.status === 'uploading' && (
-                    <span className="text-blue-500">{att.progress}%</span>
+                    <span className="text-teal-500">{att.progress}%</span>
                   )}
                   {att.status === 'done' && <span className="text-green-500">✓</span>}
                   {att.status === 'error' && <span className="text-red-500">✕</span>}
@@ -216,6 +222,8 @@ export function ChatInput() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={() => setIsComposing(false)}
             placeholder="给 LiteFlow 发送消息..."
             rows={1}
             disabled={isStreaming}

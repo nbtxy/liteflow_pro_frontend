@@ -71,14 +71,14 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
               <div className="border-t border-gray-100 bg-gray-50/50">
                 <button
                   onClick={() => { setLocale('zh'); setLangSubOpen(false); setIsOpen(false); }}
-                  className={`w-full text-left px-8 py-2 text-sm flex items-center justify-between transition-colors ${locale === 'zh' ? 'text-blue-600 font-medium bg-blue-50/50' : 'text-gray-600 hover:bg-gray-100'}`}
+                  className={`w-full text-left px-8 py-2 text-sm flex items-center justify-between transition-colors ${locale === 'zh' ? 'text-teal-600 font-medium bg-teal-50/50' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
                   中文
                   {locale === 'zh' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
                 </button>
                 <button
                   onClick={() => { setLocale('en'); setLangSubOpen(false); setIsOpen(false); }}
-                  className={`w-full text-left px-8 py-2 text-sm flex items-center justify-between transition-colors ${locale === 'en' ? 'text-blue-600 font-medium bg-blue-50/50' : 'text-gray-600 hover:bg-gray-100'}`}
+                  className={`w-full text-left px-8 py-2 text-sm flex items-center justify-between transition-colors ${locale === 'en' ? 'text-teal-600 font-medium bg-teal-50/50' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
                   English
                   {locale === 'en' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
@@ -109,7 +109,7 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
         }`}
         title={isCollapsed ? user.name : undefined}
       >
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center font-medium shadow-sm shrink-0">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-white flex items-center justify-center font-medium shadow-sm shrink-0">
           {user.avatar}
         </div>
         {!isCollapsed && (

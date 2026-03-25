@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LiteFlow Assistant",
-  description: "LiteFlow AI 聊天助手",
+  title: "LiteFlow",
+  description: "LiteFlow AI 工作台",
 };
 
 export default function RootLayout({

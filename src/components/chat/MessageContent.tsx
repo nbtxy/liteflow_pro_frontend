@@ -38,7 +38,7 @@ export function MessageContent({ content, isStreaming }: Props) {
   return (
     <div
       ref={containerRef}
-      className="message-content prose prose-sm dark:prose-invert max-w-none"
+      className="message-content prose prose-sm dark:prose-invert max-w-none pb-2"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

@@ -7,6 +7,7 @@ import { artifactToFileItem } from '@/lib/types';
 import { useLanguage } from '@/lib/i18n/context';
 import { downloadFileWithAuth, deleteFileWithAuth } from '@/lib/fileUtils';
 import { toast } from '@/components/ui/Toast';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function FileList() {
   const { currentConversationId, files, artifacts, selectedArtifactId, selectArtifact, setPreviewFile, removeFile, removeArtifact, loadFiles } = useChatStore();
@@ -112,7 +113,7 @@ export function FileList() {
           <div
             key={file.artifactId || `file-${idx}`}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors group ${
-              file.artifactId === selectedArtifactId ? 'bg-blue-50' : 'hover:bg-gray-100'
+              file.artifactId === selectedArtifactId ? 'bg-teal-50' : 'hover:bg-gray-100'
             }`}
           >
             <span className="text-base flex-shrink-0">{getFileIcon(file.type)}</span>
@@ -161,37 +162,21 @@ export function FileList() {
         ))}
       </div>
 
-      {/* 删除确认弹窗 */}
-      {pendingDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full">
-            <h3 className="text-base font-semibold text-gray-900 mb-3">
-              {t.chat.workspace.deleteConfirmTitle}
-            </h3>
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 rounded-lg mb-3">
-              <span className="text-base flex-shrink-0">{getFileIcon(pendingDelete.file.type)}</span>
-              <span className="text-sm text-gray-700 truncate">{pendingDelete.file.name}</span>
-            </div>
-            <p className="text-sm text-gray-500">
-              {t.chat.workspace.deleteConfirmDesc}
-            </p>
-            <div className="flex justify-end gap-3 mt-5">
-              <button
-                onClick={handleDeleteCancel}
-                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                {t.common.cancel}
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                className="px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
-              >
-                {t.common.delete}
-              </button>
-            </div>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={t.chat.workspace.deleteConfirmTitle}
+        description={t.chat.workspace.deleteConfirmDesc}
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      >
+        {pendingDelete && (
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 rounded-lg">
+            <span className="text-base flex-shrink-0">{getFileIcon(pendingDelete.file.type)}</span>
+            <span className="text-sm text-gray-700 truncate">{pendingDelete.file.name}</span>
           </div>
-        </div>
-      )}
+        )}
+      </ConfirmDialog>
     </>
   );
 }

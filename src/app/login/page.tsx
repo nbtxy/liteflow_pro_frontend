@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { setTokens } from '@/lib/auth';
 import { getApiUrl } from '@/lib/config';
 import { useLanguage } from '@/lib/i18n/context';
@@ -115,14 +116,14 @@ export default function LoginPage() {
           <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
             <button
               onClick={() => { setLocale('zh'); setLangOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${locale === 'zh' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${locale === 'zh' ? 'bg-teal-50 text-teal-600 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
             >
               中文
               {locale === 'zh' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
             </button>
             <button
               onClick={() => { setLocale('en'); setLangOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${locale === 'en' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between transition-colors ${locale === 'en' ? 'bg-teal-50 text-teal-600 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
             >
               English
               {locale === 'en' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
@@ -132,9 +133,12 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-lg">
-        <h1 className="text-2xl font-bold text-center mb-8 text-gray-900">
-          {t.login.title}
-        </h1>
+        <div className="flex flex-col items-center mb-8">
+          <Image src="/logo.svg" alt="LiteFlow" width={56} height={56} className="mb-3" />
+          <h1 className="text-2xl font-bold text-gray-900">
+            {t.login.title}
+          </h1>
+        </div>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">{error}</div>
@@ -170,7 +174,7 @@ export default function LoginPage() {
             <button
               onClick={sendCode}
               disabled={countdown > 0 || !phone.trim()}
-              className="pr-2 w-[100px] text-center text-blue-600 font-medium text-sm whitespace-nowrap disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0"
+              className="pr-2 w-[100px] text-center text-teal-600 font-medium text-sm whitespace-nowrap disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shrink-0"
             >
               {countdown > 0 ? `${countdown}s` : t.login.sendCode}
             </button>
@@ -180,7 +184,7 @@ export default function LoginPage() {
           <button
             onClick={handleLogin}
             disabled={loading || !phone.trim() || !code.trim()}
-            className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-medium text-base hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3.5 bg-teal-600 text-white rounded-xl font-medium text-base hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? t.login.submitting : t.login.submit}
           </button>
@@ -190,7 +194,7 @@ export default function LoginPage() {
             <button
               onClick={() => setAgreed(!agreed)}
               className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
-                agreed ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'
+                agreed ? 'bg-teal-600 border-teal-600' : 'border-gray-300 bg-white'
               }`}
             >
               {agreed && (
@@ -200,7 +204,7 @@ export default function LoginPage() {
               )}
             </button>
             <span className="text-sm text-gray-500">
-              {t.login.agreement}<a href="#" className="text-blue-600">{t.login.terms}</a>{t.login.and}<a href="#" className="text-blue-600">{t.login.privacy}</a>
+              {t.login.agreement}<a href="#" className="text-teal-600">{t.login.terms}</a>{t.login.and}<a href="#" className="text-teal-600">{t.login.privacy}</a>
             </span>
           </div>
         </div>
