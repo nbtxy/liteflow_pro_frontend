@@ -17,7 +17,6 @@ export default function LoginPage() {
   const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [agreed, setAgreed] = useState(false);
 
   // 点击外部关闭语言面板
   useEffect(() => {
@@ -64,10 +63,6 @@ export default function LoginPage() {
 
   const handleLogin = useCallback(async () => {
     if (!phone.trim() || !code.trim()) return;
-    if (!agreed) {
-      setError(t.login.agreeFirst);
-      return;
-    }
     setLoading(true);
     setError('');
     try {
@@ -94,7 +89,7 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }, [phone, code, agreed, router, t]);
+  }, [phone, code, router, t]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
@@ -190,23 +185,9 @@ export default function LoginPage() {
           </button>
 
           {/* 协议 */}
-          <div className="flex items-center justify-center gap-2 pt-1">
-            <button
-              onClick={() => setAgreed(!agreed)}
-              className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
-                agreed ? 'bg-teal-600 border-teal-600' : 'border-gray-300 bg-white'
-              }`}
-            >
-              {agreed && (
-                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-            <span className="text-sm text-gray-500">
-              {t.login.agreement}<a href="#" className="text-teal-600">{t.login.terms}</a>{t.login.and}<a href="#" className="text-teal-600">{t.login.privacy}</a>
-            </span>
-          </div>
+          <p className="text-xs text-gray-400 text-center pt-1">
+            {t.login.agreement}<a href="#" className="text-teal-600 hover:underline">{t.login.terms}</a>{t.login.and}<a href="#" className="text-teal-600 hover:underline">{t.login.privacy}</a>
+          </p>
         </div>
       </div>
     </div>
