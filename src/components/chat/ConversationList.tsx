@@ -268,7 +268,18 @@ export function ConversationList() {
                       className="flex-1 text-sm bg-white border border-teal-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-teal-500"
                     />
                   ) : (
-                    <span className="flex-1 truncate text-sm">{conv.title || t.chat.newChat}</span>
+                    <span className="flex-1 truncate text-sm flex items-center gap-1.5">
+                      <span className="truncate">{conv.title || t.chat.newChat}</span>
+                      {conv.channelType === 'feishu' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 text-[10px]">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M4 12a8 8 0 0116 0v3a3 3 0 01-3 3H7a3 3 0 01-3-3v-3z" strokeWidth="1.5" />
+                            <path d="M9 12l3 3 3-3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          Feishu
+                        </span>
+                      )}
+                    </span>
                   )}
 
                   {/* 更多操作按钮 */}
@@ -373,7 +384,18 @@ export function ConversationList() {
                       <svg className="w-4 h-4 shrink-0 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                       </svg>
-                      <span className="flex-1 truncate text-sm">{conv.title || t.chat.newChat}</span>
+                      <span className="flex-1 truncate text-sm flex items-center gap-1.5">
+                        <span className="truncate">{conv.title || t.chat.newChat}</span>
+                        {conv.channelType === 'feishu' && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 text-[10px]">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <path d="M4 12a8 8 0 0116 0v3a3 3 0 01-3 3H7a3 3 0 01-3-3v-3z" strokeWidth="1.5" />
+                              <path d="M9 12l3 3 3-3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            Feishu
+                          </span>
+                        )}
+                      </span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

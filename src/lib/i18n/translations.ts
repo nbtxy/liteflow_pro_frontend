@@ -37,6 +37,7 @@ export const translations = {
     },
     login: {
       title: 'LiteFlow',
+      subtitle: 'Your AI Workspace',
       phoneLabel: 'Phone Number',
       phonePlaceholder: 'Enter phone number',
       codeLabel: 'Verification Code',
@@ -221,6 +222,7 @@ export const translations = {
     },
     login: {
       title: 'LiteFlow',
+      subtitle: '你的 AI 工作台',
       phoneLabel: '手机号',
       phonePlaceholder: '请输入手机号',
       codeLabel: '验证码',

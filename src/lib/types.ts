@@ -11,6 +11,7 @@ export interface Conversation {
   title: string;
   createdAt: string;
   updatedAt: string;
+  channelType?: string;
 }
 
 // 消息相关

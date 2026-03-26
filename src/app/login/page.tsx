@@ -92,9 +92,13 @@ export default function LoginPage() {
   }, [phone, code, router, t]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 relative">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50/50 via-white to-gray-50 relative overflow-hidden">
+      {/* 装饰光晕 */}
+      <div className="absolute -top-24 -right-24 w-96 h-96 bg-teal-100/40 rounded-full blur-3xl" />
+      <div className="absolute -bottom-32 -left-32 w-[28rem] h-[28rem] bg-teal-50/60 rounded-full blur-3xl" />
+
       {/* 语言切换 */}
-      <div className="absolute top-4 right-4" ref={langRef}>
+      <div className="absolute top-4 right-4 z-10" ref={langRef}>
         <button
           onClick={() => setLangOpen(!langOpen)}
           className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -127,12 +131,13 @@ export default function LoginPage() {
         )}
       </div>
 
-      <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow-lg">
-        <div className="flex flex-col items-center mb-8">
-          <Image src="/logo.svg" alt="LiteFlow" width={56} height={56} className="mb-3" />
-          <h1 className="text-2xl font-bold text-gray-900">
-            {t.login.title}
-          </h1>
+      <div className="relative w-full max-w-sm p-8 bg-white rounded-3xl shadow-xl shadow-gray-200/50 ring-1 ring-gray-100">
+        <div className="flex items-center gap-3 pb-6 mb-6 border-b border-gray-100">
+          <Image src="/logo.svg" alt="LiteFlow" width={48} height={48} className="shrink-0" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{t.login.title}</h1>
+            <p className="text-sm text-gray-400 tracking-wide">{t.login.subtitle}</p>
+          </div>
         </div>
 
         {error && (
@@ -141,7 +146,7 @@ export default function LoginPage() {
 
         <div className="space-y-4">
           {/* 手机号 */}
-          <div className="flex items-center bg-gray-100 rounded-xl overflow-hidden">
+          <div className="flex items-center bg-gray-50 rounded-xl overflow-hidden transition-all duration-200 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:bg-white">
             <span className="pl-4 pr-3 text-gray-900 font-medium text-base shrink-0">+86</span>
             <div className="w-px h-6 bg-gray-300" />
             <input
@@ -155,7 +160,7 @@ export default function LoginPage() {
           </div>
 
           {/* 验证码 */}
-          <div className="flex items-center bg-gray-100 rounded-xl overflow-hidden">
+          <div className="flex items-center bg-gray-50 rounded-xl overflow-hidden transition-all duration-200 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:bg-white">
             <input
               type="text"
               value={code}
@@ -179,13 +184,13 @@ export default function LoginPage() {
           <button
             onClick={handleLogin}
             disabled={loading || !phone.trim() || !code.trim()}
-            className="w-full py-3.5 bg-teal-600 text-white rounded-xl font-medium text-base hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 text-white rounded-xl font-medium text-base hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-200"
           >
             {loading ? t.login.submitting : t.login.submit}
           </button>
 
           {/* 协议 */}
-          <p className="text-xs text-gray-400 text-center pt-1">
+          <p className="text-xs text-gray-500 text-center pt-1">
             {t.login.agreement}<a href="#" className="text-teal-600 hover:underline">{t.login.terms}</a>{t.login.and}<a href="#" className="text-teal-600 hover:underline">{t.login.privacy}</a>
           </p>
         </div>
