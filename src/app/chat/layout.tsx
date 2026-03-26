@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useChatStore } from '@/stores/chat';
 import { ConversationList } from '@/components/chat/ConversationList';
-import { ArtifactPanel } from '@/components/artifact/ArtifactPanel';
-import { GlobalFilePreviewModal } from '@/components/artifact/GlobalFilePreviewModal';
-import { useLanguage } from '@/lib/i18n/context';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export default function ChatLayout({
@@ -15,18 +12,20 @@ export default function ChatLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { t } = useLanguage();
+  const pathname = usePathname();
   const {
     currentConversationId,
     sidebarOpen,
     toggleSidebar,
     setSidebarOpen,
     desktopSidebarOpen,
-    toggleDesktopSidebar,
     setDesktopSidebarOpen,
     artifactPanelOpen,
     setArtifactPanelOpen,
   } = useChatStore();
+
+  // 判断当前是否在会话页面（/chat 或 /chat/[uuid]）
+  const isChatView = pathname === '/chat' || /^\/chat\/[0-9a-f-]+$/i.test(pathname);
 
   // Sync store with route (Store updates -> URL changes)
   useEffect(() => {
@@ -71,26 +70,8 @@ export default function ChatLayout({
         </div>
       </aside>
 
-      {/* 主内容区 */}
-      <main className="flex-1 flex flex-col min-w-0 relative h-full">
-        {/* 桌面端右侧面板切换按钮（仅当面板关闭时显示） */}
-        {!artifactPanelOpen && (
-          <div className="hidden md:block absolute top-4 right-4 z-40">
-            <button
-              onClick={() => setArtifactPanelOpen(true)}
-              className="p-2 rounded-lg text-gray-500 hover:text-gray-900 transition-colors bg-white border border-gray-200 shadow-sm hover:bg-gray-50"
-              title={t.chat.workspace.open}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
-                <line x1="15" x2="15" y1="3" y2="21"/>
-                <path d="m8 9-3 3 3 3"/>
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {/* 顶部栏（移动端汉堡菜单 + 右侧面板入口） */}
+      {/* 移动端顶部栏 */}
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white md:hidden">
           <div className="flex items-center">
             <button onClick={toggleSidebar} className="p-1 text-gray-600 hover:text-gray-900">
@@ -100,26 +81,24 @@ export default function ChatLayout({
             </button>
             <h1 className="ml-3 text-lg font-semibold text-gray-900">LiteFlow</h1>
           </div>
-          <button
-            onClick={() => setArtifactPanelOpen(!artifactPanelOpen)}
-            className="p-1 text-gray-600 hover:text-gray-900"
-            title={artifactPanelOpen ? t.chat.workspace.close : t.chat.workspace.open}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
-              <line x1="15" x2="15" y1="3" y2="21"/>
-            </svg>
-          </button>
+          {isChatView && (
+            <button
+              onClick={() => setArtifactPanelOpen(!artifactPanelOpen)}
+              className="p-1 text-gray-600 hover:text-gray-900"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                <line x1="15" x2="15" y1="3" y2="21"/>
+              </svg>
+            </button>
+          )}
         </header>
 
-        {children}
-      </main>
-
-      {/* Artifact 面板（右侧） */}
-      <ArtifactPanel />
-
-      {/* 全局文件预览弹窗 */}
-      <GlobalFilePreviewModal />
+        {/* 主内容区 + 右侧面板（由子页面通过 ChatWrapper 提供） */}
+        <div className="flex-1 flex min-h-0">
+          {children}
+        </div>
+      </div>
     </div>
     </AuthGuard>
   );

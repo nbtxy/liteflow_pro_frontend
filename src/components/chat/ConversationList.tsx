@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useChatStore } from '@/stores/chat';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Spinner } from '@/components/ui/Spinner';
@@ -10,6 +10,7 @@ import { useLanguage } from '@/lib/i18n/context';
 
 export function ConversationList() {
   const router = useRouter();
+  const pathname = usePathname();
   const { t } = useLanguage();
   const {
     conversations,
@@ -164,6 +165,58 @@ export function ConversationList() {
         </button>
       </div>
 
+      {/* 功能入口 */}
+      {desktopSidebarOpen ? (
+        <div className="px-3 pb-3 grid grid-cols-4 gap-1.5">
+          {([
+            { path: '/chat/im', label: 'IM', title: 'IM 消息', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4' },
+            { path: '/chat/connectors', label: '连接器', title: '连接器', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+            { path: '/chat/skills', label: '技能', title: '技能市场', icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z' },
+            { path: '/chat/schedules', label: '定时', title: '定时任务', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+          ]).map(item => (
+            <button
+              key={item.path}
+              onClick={() => router.push(item.path)}
+              className={`flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${
+                pathname === item.path
+                  ? 'bg-teal-50 text-teal-600'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-teal-600'
+              }`}
+              title={item.title}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+              </svg>
+              <span className="text-[10px] leading-tight">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="px-1.5 pb-2 space-y-1">
+          {([
+            { path: '/chat/im', title: 'IM 消息', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4' },
+            { path: '/chat/connectors', title: '连接器', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+            { path: '/chat/skills', title: '技能市场', icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z' },
+            { path: '/chat/schedules', title: '定时任务', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+          ]).map(item => (
+            <button
+              key={item.path}
+              onClick={() => router.push(item.path)}
+              className={`w-full p-2 rounded-lg transition-colors flex items-center justify-center ${
+                pathname === item.path
+                  ? 'bg-teal-50 text-teal-600'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-teal-600'
+              }`}
+              title={item.title}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 搜索框 */}
       {desktopSidebarOpen && (
         <div className="px-3 pb-3">
@@ -194,7 +247,7 @@ export function ConversationList() {
                   key={conv.id}
                   onClick={() => router.push(`/chat/${conv.id}`)}
                   className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-                    currentConversationId === conv.id
+                    pathname === `/chat/${conv.id}`
                       ? 'bg-teal-50 text-teal-700'
                       : 'hover:bg-gray-100 text-gray-700'
                   }`}
@@ -312,7 +365,7 @@ export function ConversationList() {
                       key={conv.id}
                       onClick={() => router.push(`/chat/${conv.id}`)}
                       className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                        currentConversationId === conv.id
+                        pathname === `/chat/${conv.id}`
                           ? 'bg-teal-50 text-teal-700'
                           : 'hover:bg-gray-100 text-gray-400'
                       }`}

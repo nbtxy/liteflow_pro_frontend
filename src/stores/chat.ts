@@ -125,7 +125,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ conversationsLoading: true });
     try {
       const data = await apiFetch('/api/conversations');
-      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      const list = Array.isArray(data)
+        ? (data as Conversation[])
+        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Conversation[]);
       set({ conversations: list });
     } catch {
       toast.error(getT().chat.loadConversationsFailed);
@@ -140,7 +142,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     try {
       const data = await apiFetch(`/api/conversations/search?q=${encodeURIComponent(query)}`);
-      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      const list = Array.isArray(data)
+        ? (data as Conversation[])
+        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Conversation[]);
       set({ conversations: list });
     } catch {
       toast.error(getT().chat.searchConversationsFailed);
@@ -266,7 +270,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ messagesLoading: true });
     try {
       const data = await apiFetch(`/api/conversations/${conversationId}/messages`);
-      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      const list = Array.isArray(data)
+        ? (data as Message[])
+        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Message[]);
       set({ messages: list });
     } catch {
       toast.error(getT().chat.loadMessagesFailed);
@@ -708,7 +714,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   loadFiles: async (conversationId: string) => {
     try {
       const data = await apiFetch(`/api/conversations/${conversationId}/files`);
-      const list = Array.isArray(data) ? data : (data?.content ?? data?.items ?? []);
+      const list = Array.isArray(data)
+        ? (data as FileItem[])
+        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as FileItem[]);
       set({ files: list });
     } catch {
       // silently fail

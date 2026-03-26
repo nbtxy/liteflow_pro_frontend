@@ -164,8 +164,8 @@ export function FileList() {
 
       <ConfirmDialog
         open={!!pendingDelete}
-        title={t.chat.workspace.deleteConfirmTitle}
-        description={t.chat.workspace.deleteConfirmDesc}
+        title={t.chat.filePanel.deleteConfirmTitle}
+        description={t.chat.filePanel.deleteConfirmDesc}
         variant="danger"
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
