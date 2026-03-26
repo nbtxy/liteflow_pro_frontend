@@ -61,6 +61,12 @@ interface ChatStore {
   deleteConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, title: string) => Promise<void>;
   archiveConversation: (id: string) => Promise<void>;
+  unarchiveConversation: (id: string) => Promise<void>;
+
+  // 归档会话
+  archivedConversations: Conversation[];
+  archivedLoading: boolean;
+  loadArchivedConversations: () => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   stopGeneration: () => void;
@@ -98,6 +104,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   conversations: [],
   currentConversationId: null,
   conversationsLoading: false,
+  archivedConversations: [],
+  archivedLoading: false,
   messages: [],
   messagesLoading: false,
   isStreaming: false,
@@ -219,8 +227,38 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
       }
       toast.success(getT().chat.archiveSuccess);
+      // 刷新归档列表
+      get().loadArchivedConversations();
     } catch {
       toast.error(getT().chat.archiveConversationFailed);
+    }
+  },
+
+  unarchiveConversation: async (id: string) => {
+    try {
+      await apiFetch(`/api/conversations/${id}/unarchive`, { method: 'POST' });
+      const { archivedConversations } = get();
+      const conv = archivedConversations.find((c) => c.id === id);
+      set({
+        archivedConversations: archivedConversations.filter((c) => c.id !== id),
+      });
+      if (conv) {
+        set({ conversations: [conv, ...get().conversations] });
+      }
+      toast.success(getT().chat.unarchiveSuccess);
+    } catch {
+      toast.error(getT().chat.unarchiveConversationFailed);
+    }
+  },
+
+  loadArchivedConversations: async () => {
+    set({ archivedLoading: true });
+    try {
+      const data = await apiFetch('/api/conversations?archived=true');
+      const list = Array.isArray(data) ? data : ((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []);
+      set({ archivedConversations: list as Conversation[], archivedLoading: false });
+    } catch {
+      set({ archivedLoading: false });
     }
   },
 

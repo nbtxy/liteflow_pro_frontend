@@ -21,6 +21,10 @@ export function ConversationList() {
     deleteConversation,
     renameConversation,
     archiveConversation,
+    unarchiveConversation,
+    archivedConversations,
+    archivedLoading,
+    loadArchivedConversations,
     desktopSidebarOpen,
     toggleDesktopSidebar,
   } = useChatStore();
@@ -30,12 +34,14 @@ export function ConversationList() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [archivedOpen, setArchivedOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadConversations();
-  }, [loadConversations]);
+    loadArchivedConversations();
+  }, [loadConversations, loadArchivedConversations]);
 
   // 搜索 debounce
   useEffect(() => {
@@ -270,6 +276,69 @@ export function ConversationList() {
               ))}
             </div>
           )
+        )}
+
+        {/* 已归档分组 */}
+        {desktopSidebarOpen && archivedConversations.length > 0 && (
+          <div className="px-2 mt-2">
+            <button
+              onClick={() => setArchivedOpen(!archivedOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg
+                className={`w-3 h-3 transition-transform ${archivedOpen ? 'rotate-90' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              <span>{t.chat.archivedChats}</span>
+              <span className="text-gray-300">({archivedConversations.length})</span>
+            </button>
+
+            {archivedOpen && (
+              <div className="space-y-0.5 mt-1">
+                {archivedLoading ? (
+                  <div className="p-2 flex items-center justify-center gap-2 text-gray-400">
+                    <Spinner className="w-3 h-3" />
+                  </div>
+                ) : (
+                  archivedConversations.map((conv) => (
+                    <div
+                      key={conv.id}
+                      onClick={() => router.push(`/chat/${conv.id}`)}
+                      className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                        currentConversationId === conv.id
+                          ? 'bg-teal-50 text-teal-700'
+                          : 'hover:bg-gray-100 text-gray-400'
+                      }`}
+                    >
+                      <svg className="w-4 h-4 shrink-0 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      <span className="flex-1 truncate text-sm">{conv.title || t.chat.newChat}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unarchiveConversation(conv.id);
+                        }}
+                        className="shrink-0 p-1 rounded text-gray-400 opacity-0 group-hover:opacity-100 hover:text-teal-600 hover:bg-teal-50 transition-all"
+                        title={t.common.unarchive}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

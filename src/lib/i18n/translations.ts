@@ -100,6 +100,9 @@ export const translations = {
       confirmDeleteTitle: 'Delete Conversation',
       confirmDeleteDesc: 'This conversation will be permanently deleted and cannot be recovered.',
       renamePlaceholder: 'Enter new name',
+      unarchiveSuccess: 'Unarchived successfully',
+      unarchiveConversationFailed: 'Failed to unarchive conversation',
+      archivedChats: 'Archived',
       loadMessagesFailed: 'Failed to load message history',
       sendMessageFailed: 'Failed to send message, please check network connection',
       history: {
@@ -278,6 +281,9 @@ export const translations = {
       confirmDeleteTitle: '删除对话',
       confirmDeleteDesc: '该对话将被永久删除，且无法恢复。',
       renamePlaceholder: '输入新名称',
+      unarchiveSuccess: '已取消归档',
+      unarchiveConversationFailed: '取消归档失败',
+      archivedChats: '已归档',
       loadMessagesFailed: '加载历史消息失败',
       sendMessageFailed: '消息发送失败，请检查网络连接',
       history: {
