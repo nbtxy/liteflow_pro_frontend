@@ -16,10 +16,12 @@ interface ToastStore {
   removeToast: (id: string) => void;
 }
 
+let toastIdCounter = 0;
+
 export const useToastStore = create<ToastStore>((set) => ({
   toasts: [],
   addToast: (message, type) => {
-    const id = Date.now().toString();
+    const id = `${Date.now()}-${toastIdCounter++}`;
     set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
     setTimeout(() => {
       set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));

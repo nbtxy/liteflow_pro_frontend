@@ -11,6 +11,7 @@ interface Channel {
   id: string;
   type: string;
   name: string;
+  displayName?: string;
   status: 'active' | 'error' | 'stopped' | 'pending';
   appId?: string;
   errorMessage?: string;
@@ -119,8 +120,9 @@ function AddFeishuDialog({ open, onClose, onSuccess }: { open: boolean; onClose:
       await apiFetch('/api/user/channels', {
         method: 'POST',
         body: JSON.stringify({
-          type: 'feishu',
-          name: name.trim(),
+          type: 'im',
+          name: 'feishu',
+          displayName: name.trim(),
           config: { appId: appId.trim(), appSecret: appSecret.trim() },
         }),
       });
@@ -342,7 +344,7 @@ function FeishuChannelCard({ channel, onRestart, onDelete }: {
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-2">
           <span className="text-xl">🤖</span>
-          <span className="font-medium text-gray-900">{channel.name}</span>
+          <span className="font-medium text-gray-900">{channel.displayName || channel.name}</span>
         </div>
         <StatusBadge status={channel.status} />
       </div>
@@ -413,7 +415,7 @@ export function ChannelsView() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [fetchChannels]);
 
-  const feishuChannels = channels.filter(c => c.type === 'feishu');
+  const feishuChannels = channels.filter(c => c.type === 'im' && c.name === 'feishu');
 
   function handleChannelTypeSelect(type: string) {
     setShowSelector(false);
@@ -435,7 +437,7 @@ export function ChannelsView() {
 
   function handleDeleteRequest(channel: Channel) {
     setDeleteId(channel.id);
-    setDeleteName(channel.name);
+    setDeleteName(channel.displayName || channel.name);
   }
 
   async function handleDeleteConfirm() {

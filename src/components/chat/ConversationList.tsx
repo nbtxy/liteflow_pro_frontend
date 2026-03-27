@@ -14,7 +14,6 @@ export function ConversationList() {
   const { t } = useLanguage();
   const {
     conversations,
-    currentConversationId,
     conversationsLoading,
     loadConversations,
     searchConversations,
