@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
-import { streamChat } from '@/lib/sse';
+import { streamChat, regenerateChat } from '@/lib/sse';
 import { toast } from '@/components/ui/Toast';
 import { translations } from '@/lib/i18n/translations';
 import { getPreferredLanguage } from '@/lib/i18n/languageUtils';
@@ -273,7 +273,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const list = Array.isArray(data)
         ? (data as Message[])
         : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Message[]);
-      set({ messages: list });
+      
+      // Ensure toolCall.input is stringified to prevent React render crash
+      const processedList = list.map(msg => {
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          return {
+            ...msg,
+            toolCalls: msg.toolCalls.map(tc => ({
+              ...tc,
+              input: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
+            }))
+          };
+        }
+        return msg;
+      });
+
+      set({ messages: processedList });
     } catch {
       toast.error(getT().chat.loadMessagesFailed);
     } finally {
@@ -492,8 +507,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!currentConversationId || messages.length < 2) return;
 
     const newMessages = [...messages];
+    let assistantMessageIdToRegenerate: string | null = null;
+
     if (newMessages[newMessages.length - 1]?.role === 'assistant') {
-      newMessages.pop();
+      const assistantMsg = newMessages.pop()!;
+      if (!assistantMsg.id.startsWith('error-')) {
+        assistantMessageIdToRegenerate = assistantMsg.id;
+      }
     }
     const lastUser = newMessages[newMessages.length - 1];
     if (!lastUser || lastUser.role !== 'user') return;
@@ -504,7 +524,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ abortController });
 
     try {
-      for await (const event of streamChat(currentConversationId, lastUser.content, abortController.signal)) {
+      const chatStream = assistantMessageIdToRegenerate
+        ? regenerateChat(currentConversationId, assistantMessageIdToRegenerate, abortController.signal)
+        : streamChat(currentConversationId, lastUser.content, abortController.signal);
+
+      for await (const event of chatStream) {
         switch (event.type) {
           case 'stream_start': {
             const assistantMessage: Message = {

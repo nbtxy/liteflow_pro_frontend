@@ -32,7 +32,8 @@ export interface ToolCall {
   toolUseId: string;
   toolName: string;
   status: ToolCallStatus;
-  input?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input?: string | Record<string, any>;
   startedAt: number;
   duration?: number;
 }
@@ -78,7 +79,8 @@ export interface FileAttachment {
 }
 
 // 工具配置
-export const TOOL_CONFIG: Record<string, { icon: string; runningText: (input?: string) => string; doneText: string }> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const TOOL_CONFIG: Record<string, { icon: string; runningText: (input?: any) => string; doneText: string }> = {
   web_search: {
     icon: '🔍',
     runningText: (input) => `正在搜索: "${input || '...'}"`,
@@ -114,6 +116,23 @@ export const TOOL_CONFIG: Record<string, { icon: string; runningText: (input?: s
     runningText: () => '正在计算...',
     doneText: '计算完成',
   },
+  manage_scheduled_task: {
+    icon: '⏰',
+    runningText: (input) => {
+      const action = typeof input === 'object' ? input?.action : input;
+      const labels: Record<string, string> = {
+        create: '正在创建定时任务...',
+        list: '正在查询定时任务...',
+        update: '正在修改定时任务...',
+        pause: '正在暂停定时任务...',
+        resume: '正在恢复定时任务...',
+        delete: '正在删除定时任务...',
+        run_now: '正在执行定时任务...',
+      };
+      return labels[action] || '正在管理定时任务...';
+    },
+    doneText: '操作完成',
+  },
 };
 
 // SSE 事件类型
@@ -133,6 +152,51 @@ export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
   user: User;
+}
+
+// 定时任务相关
+export interface OutputTarget {
+  type: 'conversation' | 'feishu';
+  channelId?: string;
+  chatId?: string;
+}
+
+export interface OutputConfig {
+  targets: OutputTarget[];
+}
+
+export interface ScheduledTask {
+  id: string;
+  userId: string;
+  conversationId?: string;
+  name: string;
+  prompt: string;
+  cronExpression: string;
+  timezone: string;
+  outputConfig: OutputConfig;
+  status: 'active' | 'paused' | 'stopped';
+  maxTokens: number;
+  enableTools: boolean;
+  lastRunAt?: string;
+  lastRunStatus?: 'success' | 'failed';
+  totalRuns: number;
+  totalTokens: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskExecution {
+  id: string;
+  taskId: string;
+  status: 'success' | 'failed' | 'timeout' | 'token_limit';
+  resultSummary?: string;
+  outputTargets?: OutputConfig;
+  inputTokens?: number;
+  outputTokens?: number;
+  toolsUsed?: string[];
+  durationMs?: number;
+  errorMessage?: string;
+  createdAt: string;
 }
 
 // API 响应

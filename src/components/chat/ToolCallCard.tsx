@@ -26,6 +26,10 @@ export function ToolCallCard({ toolCall }: Props) {
     <span className="text-green-500 text-sm">✓</span>
   );
 
+  const inputForDisplay = typeof toolCall.input === 'object'
+    ? JSON.stringify(toolCall.input)
+    : toolCall.input;
+
   const displayText = isRunning
     ? config.runningText(toolCall.input)
     : config.doneText;
@@ -74,7 +78,7 @@ export function ToolCallCard({ toolCall }: Props) {
             <div>
               <span className="font-medium text-gray-600">输入: </span>
               <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700 break-all">
-                {toolCall.input}
+                {inputForDisplay}
               </code>
             </div>
           )}
