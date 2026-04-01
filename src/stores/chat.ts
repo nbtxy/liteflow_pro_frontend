@@ -38,7 +38,6 @@ interface ChatStore {
 
   // 文件面板
   artifactPanelOpen: boolean;
-  artifactPanelTab: 'artifact' | 'files';
   files: FileItem[];
 
   // 全局文件预览状态
@@ -58,6 +57,7 @@ interface ChatStore {
   searchConversations: (query: string) => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   createConversation: () => void;
+  ensureConversation: () => Promise<string>;
   deleteConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, title: string) => Promise<void>;
   archiveConversation: (id: string) => Promise<void>;
@@ -67,6 +67,8 @@ interface ChatStore {
   archivedConversations: Conversation[];
   archivedLoading: boolean;
   loadArchivedConversations: () => Promise<void>;
+
+  // 消息操作
   loadMessages: (conversationId: string) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   stopGeneration: () => void;
@@ -86,7 +88,6 @@ interface ChatStore {
   updateArtifact: (artifactId: string, update: Partial<Artifact>) => void;
   selectArtifact: (artifactId: string | null) => void;
   setArtifactPanelOpen: (open: boolean) => void;
-  setArtifactPanelTab: (tab: 'artifact' | 'files') => void;
 
   // 文件
   loadFiles: (conversationId: string) => Promise<void>;
@@ -99,6 +100,8 @@ interface ChatStore {
   removePendingAttachment: (id: string) => void;
   clearPendingAttachments: () => void;
 }
+
+let pendingEnsureConversationPromise: Promise<string> | null = null;
 
 export const useChatStore = create<ChatStore>((set, get) => ({
   conversations: [],
@@ -114,7 +117,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   artifacts: [],
   selectedArtifactId: null,
   artifactPanelOpen: false,
-  artifactPanelTab: 'artifact',
   files: [],
   previewFile: null,
   pendingAttachments: [],
@@ -177,6 +179,37 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       currentToolCalls: [],
       pendingAttachments: [],
     });
+  },
+
+  ensureConversation: async () => {
+    const { currentConversationId } = get();
+    if (currentConversationId) {
+      return currentConversationId;
+    }
+    if (pendingEnsureConversationPromise) {
+      return pendingEnsureConversationPromise;
+    }
+    
+    pendingEnsureConversationPromise = (async () => {
+      try {
+        const data = await apiFetch('/api/conversations', { method: 'POST' });
+        const conv = data as Conversation;
+        if (!conv || !conv.id) {
+          throw new Error('Invalid response');
+        }
+        set((state) => ({
+          currentConversationId: conv.id,
+          conversations: [conv, ...state.conversations],
+        }));
+        return conv.id;
+      } catch (err) {
+        toast.error(getT().chat.loadConversationsFailed || '创建会话失败');
+        throw new Error('Failed to create conversation');
+      } finally {
+        pendingEnsureConversationPromise = null;
+      }
+    })();
+    return pendingEnsureConversationPromise;
   },
 
   deleteConversation: async (id: string) => {
@@ -726,13 +759,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }));
   },
   selectArtifact: (artifactId: string | null) => {
-    set({ selectedArtifactId: artifactId, artifactPanelTab: 'artifact' });
+    set({ selectedArtifactId: artifactId });
     if (artifactId) {
       set({ artifactPanelOpen: true });
     }
   },
   setArtifactPanelOpen: (open: boolean) => set({ artifactPanelOpen: open }),
-  setArtifactPanelTab: (tab: 'artifact' | 'files') => set({ artifactPanelTab: tab }),
 
   // 文件
   loadFiles: async (conversationId: string) => {

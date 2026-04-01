@@ -14,10 +14,13 @@ export function ChatInput() {
     sendMessage,
     isStreaming,
     currentConversationId,
+    ensureConversation,
     pendingAttachments,
     addPendingAttachment,
     updatePendingAttachment,
     removePendingAttachment,
+    setArtifactPanelOpen,
+    loadFiles,
   } = useChatStore();
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -81,10 +84,19 @@ export function ChatInput() {
     });
 
     try {
+      let convId = currentConversationId;
+      if (!convId) {
+        try {
+          convId = await ensureConversation();
+        } catch (e) {
+          updatePendingAttachment(attachmentId, { status: 'error' });
+          return;
+        }
+      }
+
       const formData = new FormData();
       formData.append('file', file);
 
-      const convId = currentConversationId || 'new';
       const url = getApiUrl(`/api/conversations/${convId}/files`);
       const token = getAccessToken();
 
@@ -105,6 +117,10 @@ export function ChatInput() {
         if (xhr.status >= 200 && xhr.status < 300) {
           updatePendingAttachment(attachmentId, { status: 'done', progress: 100 });
           toast.success(`${file.name} 上传成功`);
+          setArtifactPanelOpen(true);
+          if (convId) {
+            loadFiles(convId);
+          }
         } else {
           updatePendingAttachment(attachmentId, { status: 'error' });
           toast.error(`${file.name} 上传失败`);
@@ -121,7 +137,7 @@ export function ChatInput() {
       updatePendingAttachment(attachmentId, { status: 'error' });
       toast.error(`${file.name} 上传失败`);
     }
-  }, [currentConversationId, addPendingAttachment, updatePendingAttachment]);
+  }, [currentConversationId, ensureConversation, addPendingAttachment, updatePendingAttachment, setArtifactPanelOpen, loadFiles]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
