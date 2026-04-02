@@ -7,6 +7,8 @@ import { useLanguage } from '@/lib/i18n/context';
 import { translations } from '@/lib/i18n/translations';
 import { downloadFileWithAuth, fetchFileContent, fetchFileBlobUrl } from '@/lib/fileUtils';
 import { toast } from '@/components/ui/Toast';
+import { md } from '@/lib/markdown';
+import mermaid from 'mermaid';
 
 export function GlobalFilePreviewModal() {
   const { previewFile, setPreviewFile, artifacts, currentConversationId } = useChatStore();
@@ -101,11 +103,33 @@ function getFileIcon(type: string): string {
 }
 
 function FilePreviewContent({ file, artifacts, conversationId, t }: { file: FileItem; artifacts: Artifact[]; conversationId: string | null; t: typeof translations.en }) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (file.type === 'MARKDOWN' && file.artifactId && containerRef.current) {
+      mermaid.run({
+        querySelector: '.mermaid',
+        nodes: containerRef.current.querySelectorAll('.mermaid'),
+      }).catch(err => console.error('Mermaid render error', err));
+    }
+  }, [file.type, file.artifactId]);
+
   // 优先用 artifact 内存内容
   if (file.artifactId) {
     const artifact = artifacts.find(a => a.id === file.artifactId);
     if (artifact?.content) {
-      if (file.type === 'CODE' || file.type === 'MARKDOWN' || file.type === 'DATA') {
+      if (file.type === 'MARKDOWN') {
+        return (
+          <div className="p-6 h-full overflow-auto bg-white" ref={containerRef}>
+            <div 
+              className="prose prose-slate max-w-none mx-auto markdown-body"
+              dangerouslySetInnerHTML={{ __html: md.render(artifact.content) }}
+            />
+          </div>
+        );
+      }
+
+      if (file.type === 'CODE' || file.type === 'DATA') {
         return (
           <div className="p-6 h-full">
             <pre className="h-full p-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-auto text-sm font-mono text-gray-800 m-0">
@@ -157,7 +181,8 @@ function FilePreviewContent({ file, artifacts, conversationId, t }: { file: File
 
     // 文本类文件预览
     if (file.name.match(/\.(txt|md|json|csv|xml|yaml|yml|log|js|ts|tsx|jsx|py|java|go|rs|c|cpp|h|css|html|sql|sh|bat)$/i)) {
-      return <RemoteTextPreview conversationId={conversationId} filePath={filePath} t={t} />;
+      const isMarkdown = file.type === 'MARKDOWN' || file.name.toLowerCase().endsWith('.md');
+      return <RemoteTextPreview conversationId={conversationId} filePath={filePath} isMarkdown={isMarkdown} t={t} />;
     }
   }
 
@@ -227,12 +252,13 @@ function RemoteBlobPreview({ conversationId, filePath, fileName, type, t }: {
 }
 
 // 远程文本文件预览
-function RemoteTextPreview({ conversationId, filePath, t }: {
-  conversationId: string; filePath: string; t: typeof translations.en;
+function RemoteTextPreview({ conversationId, filePath, isMarkdown, t }: {
+  conversationId: string; filePath: string; isMarkdown?: boolean; t: typeof translations.en;
 }) {
   const [content, setContent] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     fetchFileContent(conversationId, filePath)
@@ -246,6 +272,15 @@ function RemoteTextPreview({ conversationId, filePath, t }: {
       });
   }, [conversationId, filePath]);
 
+  React.useEffect(() => {
+    if (isMarkdown && content && containerRef.current) {
+      mermaid.run({
+        querySelector: '.mermaid',
+        nodes: containerRef.current.querySelectorAll('.mermaid'),
+      }).catch(err => console.error('Mermaid render error', err));
+    }
+  }, [content, isMarkdown]);
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-full text-gray-400">{t.common.loading}</div>;
   }
@@ -256,6 +291,17 @@ function RemoteTextPreview({ conversationId, filePath, t }: {
         <span className="text-7xl opacity-50">{getFileIcon('CODE')}</span>
         <p className="text-lg">{t.chat.workspace.previewNotSupported}</p>
         <p className="text-sm text-gray-400">{t.chat.workspace.downloadToView}</p>
+      </div>
+    );
+  }
+
+  if (isMarkdown) {
+    return (
+      <div className="p-6 h-full overflow-auto bg-white" ref={containerRef}>
+        <div 
+          className="prose prose-slate max-w-none mx-auto markdown-body"
+          dangerouslySetInnerHTML={{ __html: md.render(content) }}
+        />
       </div>
     );
   }

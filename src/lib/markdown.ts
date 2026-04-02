@@ -1,5 +1,13 @@
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
+import mermaid from 'mermaid';
+
+// 初始化 mermaid 配置
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'default',
+  securityLevel: 'loose',
+});
 
 function escapeHtml(str: string): string {
   return str
@@ -14,6 +22,11 @@ export const md = new MarkdownIt({
   linkify: true,     // 自动识别 URL
   breaks: true,      // 换行符转 <br>
   highlight: (str, lang) => {
+    // 拦截 mermaid 并将其包装为 mermaid class 的 div，以便客户端统一渲染
+    if (lang === 'mermaid') {
+      return `<div class="mermaid">${escapeHtml(str)}</div>`;
+    }
+
     if (lang && hljs.getLanguage(lang)) {
       try {
         return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang }).value}</code></pre>`;
