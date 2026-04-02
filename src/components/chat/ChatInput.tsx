@@ -88,7 +88,7 @@ export function ChatInput() {
       if (!convId) {
         try {
           convId = await ensureConversation();
-        } catch (e) {
+        } catch {
           updatePendingAttachment(attachmentId, { status: 'error' });
           return;
         }

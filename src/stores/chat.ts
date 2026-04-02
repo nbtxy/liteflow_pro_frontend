@@ -202,7 +202,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           conversations: [conv, ...state.conversations],
         }));
         return conv.id;
-      } catch (err) {
+      } catch {
         toast.error(getT().chat.loadConversationsFailed || '创建会话失败');
         throw new Error('Failed to create conversation');
       } finally {
