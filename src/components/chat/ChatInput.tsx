@@ -40,10 +40,11 @@ export function ChatInput() {
 
   const handleSend = useCallback(() => {
     const trimmed = content.trim();
-    if (!trimmed || isStreaming) return;
+    const hasAttachments = pendingAttachments.some(a => a.status === 'done');
+    if ((!trimmed && !hasAttachments) || isStreaming) return;
     setContent('');
     sendMessage(trimmed);
-  }, [content, isStreaming, sendMessage]);
+  }, [content, isStreaming, sendMessage, pendingAttachments]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -76,12 +77,26 @@ export function ChatInput() {
     }
 
     const attachmentId = `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const isImage = file.type.startsWith('image/');
+    let dataUrl: string | undefined;
+
+    if (isImage) {
+      dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+
     addPendingAttachment({
       id: attachmentId,
       name: file.name,
       size: file.size,
       status: 'uploading',
       progress: 0,
+      url: dataUrl,
+      type: isImage ? 'image' : 'file',
+      mimeType: file.type,
     });
 
     try {
@@ -334,9 +349,9 @@ export function ChatInput() {
             {/* 右侧：发送按钮 */}
             <button
               onClick={handleSend}
-              disabled={isStreaming || !content.trim()}
+              disabled={isStreaming || (!content.trim() && !pendingAttachments.some(a => a.status === 'done'))}
               className={`p-2 rounded-xl flex items-center justify-center transition-all duration-200 ${
-                !content.trim() || isStreaming
+                (!content.trim() && !pendingAttachments.some(a => a.status === 'done')) || isStreaming
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-black text-white shadow-sm hover:bg-gray-800'
               }`}

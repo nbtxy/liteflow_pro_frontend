@@ -76,6 +76,9 @@ export interface FileAttachment {
   size: number;
   status: 'uploading' | 'done' | 'error';
   progress: number;
+  url?: string;
+  type?: 'image' | 'file';
+  mimeType?: string;
 }
 
 // 工具配置

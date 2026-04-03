@@ -309,16 +309,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       
       // Ensure toolCall.input is stringified to prevent React render crash
       const processedList = list.map(msg => {
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
-          return {
-            ...msg,
-            toolCalls: msg.toolCalls.map(tc => ({
-              ...tc,
-              input: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
-            }))
-          };
+        let updatedMsg = { ...msg };
+        if (updatedMsg.toolCalls && updatedMsg.toolCalls.length > 0) {
+          updatedMsg.toolCalls = updatedMsg.toolCalls.map(tc => ({
+            ...tc,
+            input: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
+          }));
         }
-        return msg;
+        if (updatedMsg.attachments && updatedMsg.attachments.length > 0) {
+          updatedMsg.attachments = updatedMsg.attachments.map((att: any, idx: number) => ({
+            id: att.id || `att-${idx}-${Date.now()}`,
+            name: att.name || att.fileName || 'Unknown File',
+            size: att.size || 0,
+            status: att.status || 'done',
+            progress: att.progress || 100,
+            url: att.url,
+            type: att.type,
+            mimeType: att.mimeType,
+          }));
+        }
+        return updatedMsg;
       });
 
       set({ messages: processedList });
@@ -358,7 +368,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     let newConversationId = currentConversationId;
 
     try {
-      for await (const event of streamChat(currentConversationId, content, abortController.signal)) {
+      for await (const event of streamChat(currentConversationId, content, doneAttachments, abortController.signal)) {
         switch (event.type) {
           case 'stream_start': {
             assistantMessageId = event.messageId;
@@ -559,7 +569,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     try {
       const chatStream = assistantMessageIdToRegenerate
         ? regenerateChat(currentConversationId, assistantMessageIdToRegenerate, abortController.signal)
-        : streamChat(currentConversationId, lastUser.content, abortController.signal);
+        : streamChat(currentConversationId, lastUser.content, lastUser.attachments, abortController.signal);
 
       for await (const event of chatStream) {
         switch (event.type) {

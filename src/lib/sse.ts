@@ -1,5 +1,6 @@
 import { getAccessToken, refreshAccessToken } from './auth';
 import type { ChatEvent } from './types';
+import type { FileAttachment } from './types';
 import { getApiUrl } from './config';
 
 export async function* regenerateChat(
@@ -77,21 +78,31 @@ export async function* regenerateChat(
 }
 
 export async function* streamChat(
-
   conversationId: string | null,
   message: string,
+  attachments?: FileAttachment[],
   signal?: AbortSignal
 ): AsyncGenerator<ChatEvent> {
   let token = getAccessToken();
   const url = getApiUrl('/api/chat/stream');
   
+  // Map attachments to backend expected format
+  const mappedAttachments = attachments?.map(att => ({
+    id: att.id,
+    type: att.type || 'file',
+    url: att.url,
+    mimeType: att.mimeType,
+    fileName: att.name,
+    size: att.size,
+  }));
+
   let res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ conversationId, message }),
+    body: JSON.stringify({ conversationId, message, attachments: mappedAttachments }),
     signal,
   });
 
@@ -107,7 +118,7 @@ export async function* streamChat(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ conversationId, message }),
+      body: JSON.stringify({ conversationId, message, attachments: mappedAttachments }),
       signal,
     });
   }
