@@ -37,72 +37,13 @@ export function DiscoverSkills({ installedSlugs, onInstall, onView }: Props) {
     const fetchSearch = async () => {
       setLoading(true);
       try {
-        let data: { content: SkillItem[] } = { content: [] };
-        try {
-          data = await apiFetch(`/api/skills/search?q=${encodeURIComponent(debouncedQuery)}&size=20`);
-        } catch {
-          // Mock data based on guide
-          data = {
-            content: [
-              {
-                slug: 'steipete/obsidian',
-                name: 'obsidian',
-                description: 'Manage your Obsidian vault with AI',
-                author: 'steipete',
-                stars: 1200,
-                version: '1.2.0',
-                installed: installedSlugs.includes('steipete/obsidian'),
-                compat: { level: 'PARTIAL' as const, score: 45, issues: ['需要本地应用: obsidian'] }
-              },
-              {
-                slug: 'steipete/github',
-                name: 'github',
-                description: 'GitHub workflow automation',
-                author: 'steipete',
-                stars: 2300,
-                version: '2.1.0',
-                installed: installedSlugs.includes('steipete/github'),
-                compat: { level: 'FULL' as const, score: 100, issues: [] }
-              },
-              {
-                slug: 'nichochar/gog',
-                name: 'gog',
-                description: 'Google Workspace integration',
-                author: 'nichochar',
-                stars: 980,
-                installed: installedSlugs.includes('nichochar/gog'),
-                compat: { level: 'FULL' as const, score: 100, issues: [] }
-              },
-              {
-                slug: 'steipete/slack',
-                name: 'slack',
-                description: 'Slack messaging and channel management',
-                author: 'steipete',
-                stars: 1500,
-                installed: installedSlugs.includes('steipete/slack'),
-                compat: { level: 'FULL' as const, score: 100, issues: [] }
-              },
-              {
-                slug: 'steipete/apple-notes',
-                name: 'apple-notes',
-                description: 'Apple Notes integration (macOS only)',
-                author: 'steipete',
-                stars: 890,
-                installed: false,
-                compat: { level: 'INCOMPATIBLE' as const, score: 15, issues: ['需要 computer 能力'] }
-              }
-            ].filter(item =>
-              !debouncedQuery ||
-              item.name.includes(debouncedQuery.toLowerCase()) ||
-              item.description.toLowerCase().includes(debouncedQuery.toLowerCase())
-            )
-          };
-        }
+        const data = await apiFetch<{ content: SkillItem[] }>(`/api/skills/search?q=${encodeURIComponent(debouncedQuery)}&size=20`);
         if (active) {
           setResults(data.content || []);
         }
       } catch (err) {
         console.error(err);
+        if (active) setResults([]);
       } finally {
         if (active) setLoading(false);
       }
