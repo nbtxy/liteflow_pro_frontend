@@ -8,19 +8,12 @@ import { CompatBadge } from './CompatBadge';
 interface Props {
   skill: SkillItem;
   onClose: () => void;
-  onInstall: (skill: SkillItem) => void;
-  onUninstall: (skill: SkillItem) => void;
-  isAdmin?: boolean;
 }
 
-export function SkillDetailDialog({ skill, onClose, onInstall, onUninstall, isAdmin }: Props) {
+export function SkillDetailDialog({ skill, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [contentHtml, setContentHtml] = useState<string>('');
-  
-  // Installed if: has scope (from installed list), has installed=true flag, or is legacy global skill with no scope/slug
-  const isInstalled = skill.scope !== undefined || skill.installed === true || (!skill.scope && !skill.slug);
-  // Global if: scope explicitly 'global', or legacy skill with no scope and no slug (old backend)
-  const isGlobal = skill.scope === 'global' || (!skill.scope && !skill.slug);
+  const isGlobal = true;
 
   useEffect(() => {
     // Fetch skill detail
@@ -92,7 +85,7 @@ export function SkillDetailDialog({ skill, onClose, onInstall, onUninstall, isAd
             <div className="font-medium text-gray-900">
               {isGlobal ? '全局技能（管理员安装）' : '个人技能'}
             </div>
-            {skill.stars !== undefined && (
+            {typeof skill.stars === 'number' && (
               <>
                 <div className="text-gray-400">星标</div>
                 <div className="font-medium text-gray-900">⭐ {skill.stars.toLocaleString()}</div>
@@ -135,27 +128,12 @@ export function SkillDetailDialog({ skill, onClose, onInstall, onUninstall, isAd
             </div>
           )}
 
-          {/* 安全提示 */}
-          {!isGlobal && !isInstalled && (
-            <div className="bg-orange-50 border border-orange-100 p-4 rounded-xl">
-              <h4 className="font-medium text-orange-800 mb-1 flex items-center gap-2">
-                ⚠️ 安全提示
-              </h4>
-              <p className="text-sm text-orange-700">
-                社区技能由第三方开发者提供，安装前请确认来源可信。LiteFlow 会进行基础安全扫描，但无法保证完全安全。
-              </p>
-            </div>
-          )}
-
-          {/* 使用方式 - only shown for installed skills */}
-          {isInstalled && (
-            <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-              <h3 className="font-medium text-gray-900 text-sm">使用方式</h3>
-              <p className="text-sm text-gray-600">
-                在对话中告诉 AI 你想做什么，AI 会自动加载此技能。
-              </p>
-            </div>
-          )}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+            <h3 className="font-medium text-gray-900 text-sm">使用方式</h3>
+            <p className="text-sm text-gray-600">
+              在对话中告诉 AI 你想做什么，AI 会自动加载此技能。
+            </p>
+          </div>
 
           <div className="space-y-3">
             <h3 className="font-medium text-gray-900 border-b pb-2">技能内容</h3>
@@ -172,51 +150,12 @@ export function SkillDetailDialog({ skill, onClose, onInstall, onUninstall, isAd
 
         {/* 底部操作区 */}
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 flex-shrink-0 rounded-b-2xl">
-          {isInstalled ? (
-             <>
-               {/* 检查更新 - only for user (non-global) installed skills */}
-               {!isGlobal && (
-                 <button
-                   onClick={() => {}}
-                   className="px-4 py-2 text-sm font-medium text-teal-600 bg-white border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors"
-                 >
-                   检查更新
-                 </button>
-               )}
-               {/* Uninstall: admin can uninstall global; user can uninstall their own */}
-               {(!isGlobal || isAdmin) && (
-                 <button
-                   onClick={() => onUninstall(skill)}
-                   className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                 >
-                   卸载
-                 </button>
-               )}
-               <button
-                 onClick={onClose}
-                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-               >
-                 关闭
-               </button>
-             </>
-          ) : (
-            <>
-               <button
-                 onClick={onClose}
-                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-               >
-                 取消
-               </button>
-               {skill.compat?.level !== 'INCOMPATIBLE' && (
-                 <button
-                   onClick={() => onInstall(skill)}
-                   className="px-5 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
-                 >
-                   安装
-                 </button>
-               )}
-            </>
-          )}
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            关闭
+          </button>
         </div>
 
       </div>
