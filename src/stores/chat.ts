@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment } from '@/lib/types';
+import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment, QuotedMessage } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
 import { streamChat, regenerateChat } from '@/lib/sse';
 import { toast } from '@/components/ui/Toast';
@@ -45,6 +45,7 @@ interface ChatStore {
 
   // 文件上传
   pendingAttachments: FileAttachment[];
+  quotedMessage: QuotedMessage | null;
 
   // 侧边栏（移动端）
   sidebarOpen: boolean;
@@ -99,6 +100,8 @@ interface ChatStore {
   updatePendingAttachment: (id: string, update: Partial<FileAttachment>) => void;
   removePendingAttachment: (id: string) => void;
   clearPendingAttachments: () => void;
+  setQuotedMessage: (message: QuotedMessage | null) => void;
+  clearQuotedMessage: () => void;
 }
 
 let pendingEnsureConversationPromise: Promise<string> | null = null;
@@ -120,6 +123,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   files: [],
   previewFile: null,
   pendingAttachments: [],
+  quotedMessage: null,
   sidebarOpen: false,
   desktopSidebarOpen: true,
 
@@ -161,6 +165,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       selectedArtifactId: null,
       files: [],
       currentToolCalls: [],
+      quotedMessage: null,
     });
     await get().loadMessages(id);
     // Load files for this conversation
@@ -178,6 +183,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       files: [],
       currentToolCalls: [],
       pendingAttachments: [],
+      quotedMessage: null,
     });
   },
 
@@ -340,7 +346,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   sendMessage: async (content: string) => {
-    const { currentConversationId, messages, pendingAttachments } = get();
+    const { currentConversationId, messages, pendingAttachments, quotedMessage } = get();
 
     // Build attachments info
     const doneAttachments = pendingAttachments.filter(a => a.status === 'done');
@@ -353,12 +359,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       content,
       createdAt: new Date().toISOString(),
       attachments: doneAttachments.length > 0 ? doneAttachments : undefined,
+      quotedMessage: quotedMessage ?? undefined,
     };
     set({
       messages: [...messages, userMessage],
       isStreaming: true,
       currentToolCalls: [],
       pendingAttachments: [],
+      quotedMessage: null,
     });
 
     const abortController = new AbortController();
@@ -368,7 +376,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     let newConversationId = currentConversationId;
 
     try {
-      for await (const event of streamChat(currentConversationId, content, doneAttachments, abortController.signal)) {
+      for await (const event of streamChat(
+        currentConversationId,
+        content,
+        doneAttachments,
+        quotedMessage ?? undefined,
+        abortController.signal
+      )) {
         switch (event.type) {
           case 'stream_start': {
             assistantMessageId = event.messageId;
@@ -569,7 +583,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     try {
       const chatStream = assistantMessageIdToRegenerate
         ? regenerateChat(currentConversationId, assistantMessageIdToRegenerate, abortController.signal)
-        : streamChat(currentConversationId, lastUser.content, lastUser.attachments, abortController.signal);
+        : streamChat(
+            currentConversationId,
+            lastUser.content,
+            lastUser.attachments,
+            lastUser.quotedMessage,
+            abortController.signal
+          );
 
       for await (const event of chatStream) {
         switch (event.type) {
@@ -817,4 +837,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }));
   },
   clearPendingAttachments: () => set({ pendingAttachments: [] }),
+  setQuotedMessage: (message: QuotedMessage | null) => set({ quotedMessage: message }),
+  clearQuotedMessage: () => set({ quotedMessage: null }),
 }));

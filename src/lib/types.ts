@@ -15,6 +15,12 @@ export interface Conversation {
 }
 
 // 消息相关
+export interface QuotedMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -23,6 +29,7 @@ export interface Message {
   createdAt: string;
   toolCalls?: ToolCall[];
   attachments?: FileAttachment[];
+  quotedMessage?: QuotedMessage;
 }
 
 // 工具调用
@@ -109,7 +116,7 @@ export const TOOL_CONFIG: Record<string, { icon: string; runningText: (input?: a
     runningText: (input) => `正在修改: ${input || '...'}`,
     doneText: '修改完成',
   },
-  use_skill: {
+  search_skill: {
     icon: '📚',
     runningText: (input) => `正在加载技能: ${input || '...'}`,
     doneText: '技能已加载',

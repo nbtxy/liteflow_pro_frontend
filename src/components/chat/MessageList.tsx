@@ -18,6 +18,7 @@ export function MessageList() {
     artifacts,
     selectArtifact,
     setArtifactPanelOpen,
+    setQuotedMessage,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -61,6 +62,12 @@ export function MessageList() {
   }>({ messageId: '', type: null, showModal: false });
 
   const [feedbackReason, setFeedbackReason] = useState('');
+
+  const buildQuotedPreview = useCallback((text: string) => {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= 120) return normalized;
+    return `${normalized.slice(0, 120)}...`;
+  }, []);
 
   const handleFeedback = useCallback(async (messageId: string, type: 'up' | 'down') => {
     if (type === 'down') {
@@ -140,6 +147,17 @@ export function MessageList() {
                   </div>
                 )}
 
+                {msg.quotedMessage && (
+                  <div className={`mb-2 border-l-2 rounded-md px-2 py-1 text-xs ${
+                    isAssistant
+                      ? 'border-teal-300 bg-teal-50 text-gray-600'
+                      : 'border-teal-200 bg-teal-500/30 text-teal-100'
+                  }`}>
+                    <div>{msg.quotedMessage.role === 'assistant' ? '引用 AI' : '引用 你'}</div>
+                    <div className="truncate">{msg.quotedMessage.content}</div>
+                  </div>
+                )}
+
                 {isAssistant ? (
                   <>
                     {/* 工具调用卡片 */}
@@ -212,18 +230,35 @@ export function MessageList() {
                       <>
                         <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
                         {!isStreaming && (
-                          <button
-                            onClick={() => {
-                              setEditingMessageId(msg.id);
-                              setEditContent(msg.content);
-                            }}
-                            className="absolute -left-12 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="编辑"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
+                          <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setQuotedMessage({
+                                  id: msg.id,
+                                  role: msg.role,
+                                  content: buildQuotedPreview(msg.content),
+                                });
+                              }}
+                              className="p-1 text-gray-400 hover:text-teal-600"
+                              title="引用"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8m-8 4h5m-9 7h16a2 2 0 002-2V7a2 2 0 00-2-2H8l-4 4v10a2 2 0 002 2z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingMessageId(msg.id);
+                                setEditContent(msg.content);
+                              }}
+                              className="p-1 text-gray-400 hover:text-gray-600"
+                              title="编辑"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          </div>
                         )}
                       </>
                     )}
@@ -266,6 +301,21 @@ export function MessageList() {
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setQuotedMessage({
+                          id: msg.id,
+                          role: msg.role,
+                          content: buildQuotedPreview(msg.content),
+                        });
+                      }}
+                      className="p-1 text-gray-400 hover:text-teal-500 transition-colors"
+                      title="引用"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8m-8 4h5m-9 7h16a2 2 0 002-2V7a2 2 0 00-2-2H8l-4 4v10a2 2 0 002 2z" />
                       </svg>
                     </button>
                     {isLast && (
