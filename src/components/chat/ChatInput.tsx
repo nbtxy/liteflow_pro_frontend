@@ -80,15 +80,6 @@ export function ChatInput() {
 
     const attachmentId = `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const isImage = file.type.startsWith('image/');
-    let dataUrl: string | undefined;
-
-    if (isImage) {
-      dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-    }
 
     addPendingAttachment({
       id: attachmentId,
@@ -96,7 +87,6 @@ export function ChatInput() {
       size: file.size,
       status: 'uploading',
       progress: 0,
-      url: dataUrl,
       type: isImage ? 'image' : 'file',
       mimeType: file.type,
     });
@@ -152,6 +142,7 @@ export function ChatInput() {
         const client = getOssClient(stsToken, convIdStr);
 
         const objectKey = `conversations/${convIdStr}/uploads/${file.name}`;
+        const uploadedPath = `uploads/${file.name}`;
 
         try {
           await client.multipartUpload(objectKey, file, {
@@ -167,7 +158,7 @@ export function ChatInput() {
             { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} }
           );
           
-          updatePendingAttachment(attachmentId, { status: 'done', progress: 100 });
+          updatePendingAttachment(attachmentId, { status: 'done', progress: 100, url: uploadedPath });
           toast.success(`${file.name} 上传成功`);
           setArtifactPanelOpen(true);
           loadFiles(convIdStr);
@@ -197,7 +188,12 @@ export function ChatInput() {
 
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            updatePendingAttachment(attachmentId, { status: 'done', progress: 100 });
+            let uploadedPath: string | undefined;
+            try {
+              const payload = JSON.parse(xhr.responseText) as { data?: { path?: string } };
+              uploadedPath = payload?.data?.path;
+            } catch {}
+            updatePendingAttachment(attachmentId, { status: 'done', progress: 100, url: uploadedPath });
             toast.success(`${file.name} 上传成功`);
             setArtifactPanelOpen(true);
             loadFiles(convIdStr);
