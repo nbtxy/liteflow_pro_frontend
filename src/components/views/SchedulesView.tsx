@@ -152,8 +152,8 @@ function ExecutionsModal({
   );
 }
 
-// ─── 任务卡片 ───
-function TaskCard({
+// ─── 任务行 ───
+function TaskRow({
   task,
   onRefresh,
   onViewExecutions,
@@ -189,7 +189,7 @@ function TaskCard({
       toast.success('已触发执行，结果将推送到指定渠道');
       onRefresh();
     } catch {
-      // 错误已由 apiFetch 处理
+      // handled by apiFetch
     } finally {
       setRunning(false);
     }
@@ -223,62 +223,50 @@ function TaskCard({
 
   return (
     <>
-      <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow group flex flex-col h-full">
-        <div className="flex items-start justify-between mb-3">
+      <div className="border border-gray-200 rounded-lg p-4">
+        <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
             <span className="text-xl">📋</span>
-            <h3 className="font-medium text-gray-900 text-lg truncate max-w-[200px]" title={task.name}>
-              {task.name}
-            </h3>
+            <span className="font-medium text-gray-900">{task.name}</span>
           </div>
           <StatusBadge status={task.status} />
         </div>
 
-        <div className="space-y-2 mb-4 flex-1">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>⏰</span>
-            <span className="truncate" title={task.cronExpression}>{humanReadableCron} ({displayTimezone})</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>📤</span>
-            <span className="truncate">{formatOutputTargets}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>📊</span>
-            <span>已执行 {task.totalRuns} 次 | 消耗 {(task.totalTokens / 1000).toFixed(1)}K tokens</span>
-          </div>
+        <div className="mt-3 text-sm text-gray-500 space-y-1">
+          <div>{humanReadableCron}（{displayTimezone}）</div>
+          <div>输出: {formatOutputTargets || '-'} · 已执行 {task.totalRuns} 次 · {(task.totalTokens / 1000).toFixed(1)}K tokens</div>
           {task.lastRunAt && (
-            <div className="flex items-center gap-2 text-xs text-gray-400 mt-2 bg-gray-50 p-2 rounded">
+            <div className="text-gray-400">
               上次执行: {new Date(task.lastRunAt).toLocaleString('zh-CN')}
               {task.lastRunStatus === 'success' ? ' ✅' : ' ❌'}
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+        <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={() => onViewExecutions(task)}
-            className="flex-1 px-3 py-1.5 text-sm font-medium text-teal-600 bg-teal-50 rounded hover:bg-teal-100 transition-colors"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             执行记录
           </button>
           <button
             onClick={handleRunNow}
             disabled={running}
-            className="flex-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {running ? '执行中...' : '立即执行'}
           </button>
           <button
             onClick={handleToggleStatus}
             disabled={toggling}
-            className="flex-1 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 rounded hover:bg-orange-100 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {toggling ? '请稍候...' : task.status === 'active' ? '暂停' : '恢复'}
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
+            className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
           >
             删除
           </button>
@@ -349,51 +337,50 @@ export function SchedulesView() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-gray-50 overflow-hidden">
-      {/* 头部 */}
-      <header className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">定时任务</h1>
-          <p className="text-sm text-gray-500 mt-1">AI 按计划自动执行任务并推送结果</p>
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        {/* 头部 */}
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">定时任务</h1>
+            <p className="text-sm text-gray-500 mt-1">AI 按计划自动执行任务并推送结果</p>
+          </div>
+          <button
+            onClick={fetchTasks}
+            className="shrink-0 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="刷新列表"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
-        <button
-          onClick={fetchTasks}
-          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          title="刷新列表"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-      </header>
 
-      {/* 列表内容 */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-6xl mx-auto">
-          {tasks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 border-dashed p-12 flex flex-col items-center justify-center text-center mt-8">
-              <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center mb-4 text-3xl">
-                ⏰
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">还没有定时任务</h3>
-              <p className="text-gray-500 max-w-sm mb-6">
-                在对话中告诉 AI 你想定期做什么。例如：<br/>
-                &quot;每天早上 9 点帮我搜 AI 新闻&quot;
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onRefresh={fetchTasks}
-                  onViewExecutions={setSelectedTask}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* 列表内容 */}
+        {tasks.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-5xl mb-4">⏰</div>
+            <h3 className="text-lg font-medium text-gray-700 mb-2">还没有定时任务</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              在对话中告诉 AI 你想定期做什么。例如：<br/>
+              &quot;每天早上 9 点帮我搜 AI 新闻&quot;
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {tasks.map(task => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                onRefresh={fetchTasks}
+                onViewExecutions={setSelectedTask}
+              />
+            ))}
+            <p className="text-xs text-gray-400 mt-4">
+              共 {tasks.length} 个任务
+            </p>
+          </div>
+        )}
       </div>
 
       <ExecutionsModal

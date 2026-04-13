@@ -104,8 +104,13 @@ export function ConversationList() {
 
   const handleArchive = useCallback(async (id: string) => {
     setMenuOpenId(null);
+    const wasCurrentId = useChatStore.getState().currentConversationId;
     await archiveConversation(id);
-  }, [archiveConversation]);
+    const { conversations: remaining } = useChatStore.getState();
+    if (wasCurrentId === id && remaining.length === 0) {
+      router.push('/chat');
+    }
+  }, [archiveConversation, router]);
 
   const handleDeleteRequest = useCallback((id: string) => {
     setMenuOpenId(null);
@@ -114,10 +119,15 @@ export function ConversationList() {
 
   const handleDeleteConfirm = useCallback(async () => {
     if (deleteConfirmId) {
+      const wasCurrentId = useChatStore.getState().currentConversationId;
       await deleteConversation(deleteConfirmId);
       setDeleteConfirmId(null);
+      const { conversations: remaining } = useChatStore.getState();
+      if (wasCurrentId === deleteConfirmId && remaining.length === 0) {
+        router.push('/chat');
+      }
     }
-  }, [deleteConfirmId, deleteConversation]);
+  }, [deleteConfirmId, deleteConversation, router]);
 
   return (
     <div className="flex flex-col h-full">
