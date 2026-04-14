@@ -62,7 +62,7 @@ export interface Artifact {
 }
 
 // 文件
-export type FileSource = 'upload' | 'created' | 'generated';
+export type FileSource = 'upload' | 'generated';
 
 export interface FileItem {
   path: string;
@@ -230,7 +230,7 @@ export function artifactToFileItem(a: Artifact): FileItem {
     name: a.title,
     size: (a.content || '').length,
     type: a.type,
-    source: 'created',
+    source: 'generated',
     artifactId: a.id,
     version: a.version,
     createdAt: a.createdAt,

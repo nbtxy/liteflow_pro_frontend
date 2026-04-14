@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import OSS from 'ali-oss';
 import { useChatStore } from '@/stores/chat';
 import { toast } from '@/components/ui/Toast';
 import { getAccessToken } from '@/lib/auth';
@@ -103,113 +102,47 @@ export function ChatInput() {
       }
 
       const convIdStr = String(convId);
-      let token = getAccessToken();
+      const token = getAccessToken();
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // 1. 获取 STS Token
-      let stsToken: any = null;
-      try {
-        const url = `/api/oss/sts?conversationId=${convIdStr}`;
-        let stsRes = await fetch(getApiUrl(url), {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        
-        // Handle token expiration and refresh
-        if (stsRes.status === 401) {
-           const { refreshAccessToken } = await import('@/lib/auth');
-           token = await refreshAccessToken();
-           if (token) {
-             stsRes = await fetch(getApiUrl(url), {
-               headers: { Authorization: `Bearer ${token}` }
-             });
-           } else {
-             throw new Error('Unauthorized');
-           }
-        }
-        
-        if (stsRes.ok) {
-          const json = await stsRes.json();
-          if (json.code === 200 && json.data?.accessKeyId) {
-            stsToken = json.data;
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to get STS token', err);
+      const url = getApiUrl(`/api/conversations/${convIdStr}/files`);
+      xhr.open('POST', url);
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
 
-      if (stsToken) {
-        // 2a. 使用 OSS SDK 分片上传
-        const { getOssClient } = await import('@/lib/fileUtils');
-        const client = getOssClient(stsToken, convIdStr);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const progress = Math.round((e.loaded / e.total) * 100);
+          updatePendingAttachment(attachmentId, { progress });
+        }
+      };
 
-        const objectKey = `conversations/${convIdStr}/uploads/${file.name}`;
-        const uploadedPath = `uploads/${file.name}`;
-
-        try {
-          await client.multipartUpload(objectKey, file, {
-            progress: (p) => {
-              const progress = Math.round(p * 100);
-              updatePendingAttachment(attachmentId, { progress });
-            }
-          });
-
-          // 3. 上传完成，回调后端确认
-          await fetch(
-            getApiUrl(`/api/conversations/${convIdStr}/files/confirm-upload?path=${encodeURIComponent('uploads/' + file.name)}&size=${file.size}`),
-            { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} }
-          );
-          
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          let uploadedPath: string | undefined;
+          try {
+            const payload = JSON.parse(xhr.responseText) as { data?: { path?: string } };
+            uploadedPath = payload?.data?.path;
+          } catch {}
           updatePendingAttachment(attachmentId, { status: 'done', progress: 100, url: uploadedPath });
           toast.success(`${file.name} 上传成功`);
           setArtifactPanelOpen(true);
           loadFiles(convIdStr);
-        } catch (uploadErr) {
-          console.error('OSS upload error:', uploadErr);
+        } else {
           updatePendingAttachment(attachmentId, { status: 'error' });
           toast.error(`${file.name} 上传失败`);
         }
-      } else {
-        // 2b. 降级为通过后端代理上传 (本地存储模式)
-        const xhr = new XMLHttpRequest();
-        const formData = new FormData();
-        formData.append('file', file);
+      };
 
-        const url = getApiUrl(`/api/conversations/${convIdStr}/files`);
-        xhr.open('POST', url);
-        if (token) {
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        }
+      xhr.onerror = () => {
+        updatePendingAttachment(attachmentId, { status: 'error' });
+        toast.error(`${file.name} 上传失败`);
+      };
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const progress = Math.round((e.loaded / e.total) * 100);
-            updatePendingAttachment(attachmentId, { progress });
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            let uploadedPath: string | undefined;
-            try {
-              const payload = JSON.parse(xhr.responseText) as { data?: { path?: string } };
-              uploadedPath = payload?.data?.path;
-            } catch {}
-            updatePendingAttachment(attachmentId, { status: 'done', progress: 100, url: uploadedPath });
-            toast.success(`${file.name} 上传成功`);
-            setArtifactPanelOpen(true);
-            loadFiles(convIdStr);
-          } else {
-            updatePendingAttachment(attachmentId, { status: 'error' });
-            toast.error(`${file.name} 上传失败`);
-          }
-        };
-
-        xhr.onerror = () => {
-          updatePendingAttachment(attachmentId, { status: 'error' });
-          toast.error(`${file.name} 上传失败`);
-        };
-
-        xhr.send(formData);
-      }
+      xhr.send(formData);
     } catch {
       updatePendingAttachment(attachmentId, { status: 'error' });
       toast.error(`${file.name} 上传失败`);
