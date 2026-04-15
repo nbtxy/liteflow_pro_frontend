@@ -72,7 +72,6 @@ interface ChatStore {
   sendMessage: (content: string) => Promise<void>;
   stopGeneration: () => void;
   regenerateLastMessage: () => Promise<void>;
-  editAndResendMessage: (messageId: string, newContent: string) => Promise<void>;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   toggleDesktopSidebar: () => void;
@@ -796,19 +795,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } finally {
       set({ isStreaming: false, abortController: null });
     }
-  },
-
-  editAndResendMessage: async (messageId: string, newContent: string) => {
-    const { messages, currentConversationId } = get();
-    if (!currentConversationId) return;
-
-    const targetIndex = messages.findIndex((m) => m.id === messageId);
-    if (targetIndex === -1) return;
-
-    const newMessages = messages.slice(0, targetIndex);
-    set({ messages: newMessages });
-
-    await get().sendMessage(newContent);
   },
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),

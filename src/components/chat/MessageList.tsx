@@ -24,9 +24,6 @@ export function MessageList() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [userScrolled, setUserScrolled] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const { editAndResendMessage } = useChatStore();
 
   // 自动滚动
   useEffect(() => {
@@ -195,70 +192,25 @@ export function MessageList() {
                   </>
                 ) : (
                   <div className="relative group">
-                    {editingMessageId === msg.id ? (
-                      <div className="flex flex-col gap-2 min-w-[200px] sm:min-w-[300px]">
-                        <textarea
-                          value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
-                          className="w-full bg-teal-700 text-white border border-teal-500 rounded p-2 text-sm outline-none resize-none"
-                          rows={Math.max(3, editContent.split('\n').length)}
-                          autoFocus
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => setEditingMessageId(null)}
-                            className="px-3 py-1 text-xs bg-teal-500 hover:bg-teal-400 rounded transition-colors"
-                          >
-                            取消
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (editContent.trim() && editContent !== msg.content) {
-                                editAndResendMessage(msg.id, editContent.trim());
-                              }
-                              setEditingMessageId(null);
-                            }}
-                            className="px-3 py-1 text-xs bg-white text-teal-600 hover:bg-gray-100 rounded transition-colors"
-                          >
-                            发送
-                          </button>
-                        </div>
+                    <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+                    {!isStreaming && (
+                      <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setQuotedMessage({
+                              id: msg.id,
+                              role: msg.role,
+                              content: buildQuotedPreview(msg.content),
+                            });
+                          }}
+                          className="p-1 text-gray-400 hover:text-teal-600"
+                          title="引用"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8m-8 4h5m-9 7h16a2 2 0 002-2V7a2 2 0 00-2-2H8l-4 4v10a2 2 0 002 2z" />
+                          </svg>
+                        </button>
                       </div>
-                    ) : (
-                      <>
-                        <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
-                        {!isStreaming && (
-                          <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => {
-                                setQuotedMessage({
-                                  id: msg.id,
-                                  role: msg.role,
-                                  content: buildQuotedPreview(msg.content),
-                                });
-                              }}
-                              className="p-1 text-gray-400 hover:text-teal-600"
-                              title="引用"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8m-8 4h5m-9 7h16a2 2 0 002-2V7a2 2 0 00-2-2H8l-4 4v10a2 2 0 002 2z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingMessageId(msg.id);
-                                setEditContent(msg.content);
-                              }}
-                              className="p-1 text-gray-400 hover:text-gray-600"
-                              title="编辑"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </>
                     )}
                   </div>
                 )}
