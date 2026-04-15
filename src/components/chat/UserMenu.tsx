@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { clearTokens } from '@/lib/auth';
 import { toast } from '@/components/ui/Toast';
 import { useLanguage } from '@/lib/i18n/context';
+import { useChatStore } from '@/stores/chat';
 
 export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { locale, setLocale, t } = useLanguage();
+  const resetChatState = useChatStore((s) => s.resetChatState);
   const [langSubOpen, setLangSubOpen] = useState(false);
 
   // Mock user data
@@ -32,6 +34,7 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
   }, []);
 
   const handleLogout = () => {
+    resetChatState();
     clearTokens();
     toast.success(t.common.loggedOut);
     router.push('/login');

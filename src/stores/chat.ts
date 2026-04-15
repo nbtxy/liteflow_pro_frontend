@@ -95,6 +95,7 @@ interface ChatStore {
   clearPendingAttachments: () => void;
   setQuotedMessage: (message: QuotedMessage | null) => void;
   clearQuotedMessage: () => void;
+  resetChatState: () => void;
 }
 
 let pendingEnsureConversationPromise: Promise<string> | null = null;
@@ -868,4 +869,28 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   clearPendingAttachments: () => set({ pendingAttachments: [] }),
   setQuotedMessage: (message: QuotedMessage | null) => set({ quotedMessage: message }),
   clearQuotedMessage: () => set({ quotedMessage: null }),
+  resetChatState: () => {
+    get().abortController?.abort();
+    set((state) => ({
+      conversations: [],
+      currentConversationId: null,
+      conversationsLoading: false,
+      archivedConversations: [],
+      archivedLoading: false,
+      messages: [],
+      messagesLoading: false,
+      isStreaming: false,
+      abortController: null,
+      activeRequestId: null,
+      artifacts: [],
+      selectedArtifactId: null,
+      artifactPanelOpen: false,
+      files: [],
+      previewFile: null,
+      pendingAttachments: [],
+      quotedMessage: null,
+      sidebarOpen: false,
+      desktopSidebarOpen: state.desktopSidebarOpen,
+    }));
+  },
 }));

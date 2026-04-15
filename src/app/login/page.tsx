@@ -6,10 +6,12 @@ import Image from 'next/image';
 import { setTokens } from '@/lib/auth';
 import { getApiUrl } from '@/lib/config';
 import { useLanguage } from '@/lib/i18n/context';
+import { useChatStore } from '@/stores/chat';
 
 export default function LoginPage() {
   const router = useRouter();
   const { locale, setLocale, t } = useLanguage();
+  const resetChatState = useChatStore((s) => s.resetChatState);
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
   const [phone, setPhone] = useState('');
@@ -83,13 +85,14 @@ export default function LoginPage() {
       }
       const data = json.data;
       setTokens(data.accessToken, data.refreshToken);
+      resetChatState();
       router.replace('/chat');
     } catch {
       setError(t.login.networkError);
     } finally {
       setLoading(false);
     }
-  }, [phone, code, router, t]);
+  }, [phone, code, resetChatState, router, t]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50/50 via-white to-gray-50 relative overflow-hidden">
