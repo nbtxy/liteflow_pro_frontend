@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment, QuotedMessage, ContentPart } from '@/lib/types';
+import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment, QuotedMessage } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
 import { streamChat, regenerateChat } from '@/lib/sse';
 import { toast } from '@/components/ui/Toast';
@@ -15,26 +15,6 @@ const getT = () => {
   return translations.en;
 };
 
-// Build contentParts from a loaded message (API data without contentParts).
-// If the API returns contentParts directly, those are used instead.
-// Fallback: text first, then toolCalls (keeps visual order intuitive for users).
-function buildContentPartsFromMessage(msg: Message): ContentPart[] {
-  const parts: ContentPart[] = [];
-  if (msg.contentParts && msg.contentParts.length > 0) {
-    return msg.contentParts;
-  }
-  // Fallback for messages without contentParts: text first, then toolCalls
-  if (msg.content) {
-    parts.push({ type: 'text', text: msg.content });
-  }
-  if (msg.toolCalls && msg.toolCalls.length > 0) {
-    for (const tc of msg.toolCalls) {
-      parts.push({ type: 'tool_use', toolCall: tc });
-    }
-  }
-  return parts;
-}
-
 interface ChatStore {
   // 会话
   conversations: Conversation[];
@@ -49,9 +29,6 @@ interface ChatStore {
   isStreaming: boolean;
   abortController: AbortController | null;
   activeRequestId: string | null;
-
-  // 工具调用（当前流式消息的）
-  currentToolCalls: ToolCall[];
 
   // Artifact
   artifacts: Artifact[];
@@ -101,10 +78,6 @@ interface ChatStore {
   toggleDesktopSidebar: () => void;
   setDesktopSidebarOpen: (open: boolean) => void;
 
-  // 工具调用
-  addToolCall: (toolCall: ToolCall) => void;
-  updateToolCall: (toolUseId: string, update: Partial<ToolCall>) => void;
-
   // Artifact
   addArtifact: (artifact: Artifact) => void;
   updateArtifact: (artifactId: string, update: Partial<Artifact>) => void;
@@ -138,7 +111,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isStreaming: false,
   abortController: null,
   activeRequestId: null,
-  currentToolCalls: [],
   artifacts: [],
   selectedArtifactId: null,
   artifactPanelOpen: false,
@@ -186,7 +158,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       artifacts: [],
       selectedArtifactId: null,
       files: [],
-      currentToolCalls: [],
       quotedMessage: null,
     });
     await get().loadMessages(id);
@@ -203,7 +174,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       selectedArtifactId: null,
       artifactPanelOpen: false,
       files: [],
-      currentToolCalls: [],
       pendingAttachments: [],
       quotedMessage: null,
     });
@@ -335,15 +305,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ? (data as Message[])
         : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Message[]);
       
-      // Process messages: normalize toolCall.input, build contentParts
+      // Process messages: normalize attachments
       const processedList = list.map(msg => {
         let updatedMsg = { ...msg };
-        if (updatedMsg.toolCalls && updatedMsg.toolCalls.length > 0) {
-          updatedMsg.toolCalls = updatedMsg.toolCalls.map(tc => ({
-            ...tc,
-            input: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
-          }));
-        }
         if (updatedMsg.attachments && updatedMsg.attachments.length > 0) {
           updatedMsg.attachments = updatedMsg.attachments.map((att: any, idx: number) => ({
             id: att.id || `att-${idx}-${Date.now()}`,
@@ -355,10 +319,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             type: att.type,
             mimeType: att.mimeType,
           }));
-        }
-        // Build contentParts from API data if not already present
-        if (updatedMsg.role === 'assistant' && !updatedMsg.contentParts) {
-          updatedMsg.contentParts = buildContentPartsFromMessage(updatedMsg);
         }
         return updatedMsg;
       });
@@ -405,7 +365,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         isStreaming: true,
         abortController,
         activeRequestId: requestId,
-        currentToolCalls: [],
         pendingAttachments: [],
         quotedMessage: null,
       };
@@ -451,7 +410,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               role: 'assistant',
               content: '',
               createdAt: new Date().toISOString(),
-              toolCalls: [],
               contentParts: [],
             };
             set((state) => ({ messages: [...state.messages, assistantMessage] }));
@@ -483,35 +441,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               startedAt: Date.now(),
             };
             set((state) => {
-              const toolCalls = [...state.currentToolCalls, toolCall];
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
                 const parts = [...(last.contentParts || [])];
                 parts.push({ type: 'tool_use', toolCall });
-                msgs[msgs.length - 1] = { ...last, toolCalls: [...(last.toolCalls || []), toolCall], contentParts: parts };
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
-              return { currentToolCalls: toolCalls, messages: msgs };
+              return { messages: msgs };
             });
             break;
           }
           case 'tool_use_input': {
             set((state) => {
-              const updateTC = (tc: ToolCall) =>
-                tc.toolUseId === event.toolUseId ? { ...tc, input: event.input } : tc;
-              const toolCalls = state.currentToolCalls.map(updateTC);
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
-                const updatedToolCalls = (last.toolCalls || []).map(updateTC);
                 const parts = (last.contentParts || []).map(p =>
                   p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
                     ? { type: 'tool_use' as const, toolCall: { ...p.toolCall, input: event.input } }
                     : p
                 );
-                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls, contentParts: parts };
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
-              return { currentToolCalls: toolCalls, messages: msgs };
+              return { messages: msgs };
             });
             break;
           }
@@ -522,19 +475,31 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 tc.toolUseId === event.toolUseId
                   ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
                   : tc;
-              const toolCalls = state.currentToolCalls.map(updateTC);
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
-                const updatedToolCalls = (last.toolCalls || []).map(updateTC);
-                const parts = (last.contentParts || []).map(p =>
+                const mappedParts = (last.contentParts || []).map(p =>
                   p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
                     ? { type: 'tool_use' as const, toolCall: updateTC(p.toolCall) }
                     : p
                 );
-                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls, contentParts: parts };
+                const hasResultPart = mappedParts.some(
+                  p => p.type === 'tool_result' && p.toolUseId === event.toolUseId
+                );
+                const parts = hasResultPart
+                  ? mappedParts
+                  : [
+                      ...mappedParts,
+                      {
+                        type: 'tool_result' as const,
+                        toolUseId: event.toolUseId,
+                        status: event.status,
+                        content: event.content,
+                      },
+                    ];
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
-              return { currentToolCalls: toolCalls, messages: msgs };
+              return { messages: msgs };
             });
             break;
           }
@@ -615,7 +580,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           isStreaming: false,
           abortController: null,
           activeRequestId: null,
-          currentToolCalls: [],
         };
       });
       get().loadConversations();
@@ -626,7 +590,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   stopGeneration: () => {
     const { abortController } = get();
     abortController?.abort();
-    set({ isStreaming: false, abortController: null, activeRequestId: null, currentToolCalls: [] });
+    set({ isStreaming: false, abortController: null, activeRequestId: null });
   },
 
   regenerateLastMessage: async () => {
@@ -645,7 +609,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const lastUser = newMessages[newMessages.length - 1];
     if (!lastUser || lastUser.role !== 'user') return;
 
-    set({ messages: newMessages, isStreaming: true, currentToolCalls: [] });
+    set({ messages: newMessages, isStreaming: true });
 
     const abortController = new AbortController();
     set({ abortController });
@@ -670,7 +634,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               role: 'assistant',
               content: '',
               createdAt: new Date().toISOString(),
-              toolCalls: [],
+              contentParts: [],
             };
             set((state) => ({ messages: [...state.messages, assistantMessage] }));
             break;
@@ -680,7 +644,14 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
-                msgs[msgs.length - 1] = { ...last, content: last.content + event.content };
+                const parts = [...(last.contentParts || [])];
+                const lastPart = parts[parts.length - 1];
+                if (lastPart && lastPart.type === 'text') {
+                  parts[parts.length - 1] = { type: 'text', text: lastPart.text + event.content };
+                } else {
+                  parts.push({ type: 'text', text: event.content });
+                }
+                msgs[msgs.length - 1] = { ...last, content: last.content + event.content, contentParts: parts };
               }
               return { messages: msgs };
             });
@@ -697,48 +668,62 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
-                msgs[msgs.length - 1] = { ...last, toolCalls: [...(last.toolCalls || []), toolCall] };
+                const parts = [...(last.contentParts || [])];
+                parts.push({ type: 'tool_use', toolCall });
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
-              return { currentToolCalls: [...state.currentToolCalls, toolCall], messages: msgs };
+              return { messages: msgs };
             });
             break;
           }
           case 'tool_use_input': {
             set((state) => {
-              const toolCalls = state.currentToolCalls.map(tc =>
-                tc.toolUseId === event.toolUseId ? { ...tc, input: event.input } : tc
-              );
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
-                const updatedToolCalls = (last.toolCalls || []).map(tc =>
-                  tc.toolUseId === event.toolUseId ? { ...tc, input: event.input } : tc
+                const parts = (last.contentParts || []).map(p =>
+                  p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
+                    ? { type: 'tool_use' as const, toolCall: { ...p.toolCall, input: event.input } }
+                    : p
                 );
-                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls };
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
-              return { currentToolCalls: toolCalls, messages: msgs };
+              return { messages: msgs };
             });
             break;
           }
           case 'tool_result': {
             const now = Date.now();
             set((state) => {
-              const toolCalls = state.currentToolCalls.map(tc =>
+              const updateTC = (tc: ToolCall) =>
                 tc.toolUseId === event.toolUseId
                   ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
-                  : tc
-              );
+                  : tc;
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
-                const updatedToolCalls = (last.toolCalls || []).map(tc =>
-                  tc.toolUseId === event.toolUseId
-                    ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
-                    : tc
+                const mappedParts = (last.contentParts || []).map(p =>
+                  p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
+                    ? { type: 'tool_use' as const, toolCall: updateTC(p.toolCall) }
+                    : p
                 );
-                msgs[msgs.length - 1] = { ...last, toolCalls: updatedToolCalls };
+                const hasResultPart = mappedParts.some(
+                  p => p.type === 'tool_result' && p.toolUseId === event.toolUseId
+                );
+                const parts = hasResultPart
+                  ? mappedParts
+                  : [
+                      ...mappedParts,
+                      {
+                        type: 'tool_result' as const,
+                        toolUseId: event.toolUseId,
+                        status: event.status,
+                        content: event.content,
+                      },
+                    ];
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
-              return { currentToolCalls: toolCalls, messages: msgs };
+              return { messages: msgs };
             });
             break;
           }
@@ -809,7 +794,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         toast.error(getT().chat.sendMessageFailed);
       }
     } finally {
-      set({ isStreaming: false, abortController: null, currentToolCalls: [] });
+      set({ isStreaming: false, abortController: null });
     }
   },
 
@@ -830,18 +815,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
   toggleDesktopSidebar: () => set((state) => ({ desktopSidebarOpen: !state.desktopSidebarOpen })),
   setDesktopSidebarOpen: (open: boolean) => set({ desktopSidebarOpen: open }),
-
-  // 工具调用
-  addToolCall: (toolCall: ToolCall) => {
-    set((state) => ({ currentToolCalls: [...state.currentToolCalls, toolCall] }));
-  },
-  updateToolCall: (toolUseId: string, update: Partial<ToolCall>) => {
-    set((state) => ({
-      currentToolCalls: state.currentToolCalls.map(tc =>
-        tc.toolUseId === toolUseId ? { ...tc, ...update } : tc
-      ),
-    }));
-  },
 
   // Artifact
   addArtifact: (artifact: Artifact) => {

@@ -24,7 +24,8 @@ export interface QuotedMessage {
 // 内容片段：按实际发生顺序排列的文本和工具调用
 export type ContentPart =
   | { type: 'text'; text: string }
-  | { type: 'tool_use'; toolCall: ToolCall };
+  | { type: 'tool_use'; toolCall: ToolCall }
+  | { type: 'tool_result'; toolUseId: string; status: ToolCallStatus; content?: string };
 
 export interface Message {
   id: string;
@@ -32,7 +33,6 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
-  toolCalls?: ToolCall[];
   contentParts?: ContentPart[];
   attachments?: FileAttachment[];
   quotedMessage?: QuotedMessage;
@@ -156,8 +156,9 @@ export type ChatEvent =
   | { type: 'stream_start'; conversationId: string; messageId: string }
   | { type: 'text_delta'; content: string }
   | { type: 'tool_use_start'; toolUseId: string; toolName: string }
-  | { type: 'tool_use_input'; toolUseId: string; input: string }
-  | { type: 'tool_result'; toolUseId: string; status: 'success' | 'error' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | { type: 'tool_use_input'; toolUseId: string; input: any }
+  | { type: 'tool_result'; toolUseId: string; status: 'success' | 'error'; content?: string }
   | { type: 'artifact_created'; artifactId: string; artifactType: ArtifactType; title: string; language?: string; content?: string; url?: string; version: number }
   | { type: 'artifact_updated'; artifactId: string; version: number; content?: string; url?: string }
   | { type: 'stream_end'; usage?: { promptTokens: number; completionTokens: number } }

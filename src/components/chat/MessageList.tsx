@@ -161,31 +161,16 @@ export function MessageList() {
                 {isAssistant ? (
                   <>
                     {/* 按实际发生顺序渲染 contentParts */}
-                    {msg.contentParts && msg.contentParts.length > 0 ? (
-                      msg.contentParts.map((part, partIdx) => {
-                        if (part.type === 'tool_use') {
-                          return <ToolCallCard key={part.toolCall.toolUseId} toolCall={part.toolCall} />;
-                        }
-                        if (part.type === 'text' && part.text) {
-                          const isLastTextPart = !msg.contentParts!.slice(partIdx + 1).some(p => p.type === 'text');
-                          return <MessageContent key={`text-${partIdx}`} content={part.text} isStreaming={isStreamingThis && isLastTextPart} />;
-                        }
-                        return null;
-                      })
-                    ) : (
-                      <>
-                        {msg.content && (
-                          <MessageContent content={msg.content} isStreaming={isStreamingThis} />
-                        )}
-                        {msg.toolCalls && msg.toolCalls.length > 0 && (
-                          <div className="mb-2">
-                            {msg.toolCalls.map(tc => (
-                              <ToolCallCard key={tc.toolUseId} toolCall={tc} />
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
+                    {msg.contentParts?.map((part, partIdx) => {
+                      if (part.type === 'tool_use') {
+                        return <ToolCallCard key={part.toolCall.toolUseId} toolCall={part.toolCall} />;
+                      }
+                      if (part.type === 'text' && part.text) {
+                        const isLastTextPart = !msg.contentParts!.slice(partIdx + 1).some(p => p.type === 'text');
+                        return <MessageContent key={`text-${partIdx}`} content={part.text} isStreaming={isStreamingThis && isLastTextPart} />;
+                      }
+                      return null;
+                    })}
 
                     {/* Artifact 引用标签 */}
                     {!isStreaming && artifacts.length > 0 && msg.content && (

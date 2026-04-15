@@ -40,17 +40,19 @@ export function ToolCallCard({ toolCall }: Props) {
 
   return (
     <div
-      className={`my-2 rounded-lg border transition-colors cursor-pointer ${
+      className={`my-2 rounded-lg border transition-colors ${
         isRunning
           ? 'border-teal-200 bg-teal-50/50'
           : isError
           ? 'border-red-200 bg-red-50/50'
           : 'border-gray-200 bg-gray-50/50'
       }`}
-      onClick={() => setExpanded(!expanded)}
     >
       {/* 折叠态 */}
-      <div className="flex items-center gap-2 px-3 py-2 text-sm">
+      <div
+        className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
         <span className="text-base flex-shrink-0">{config.icon}</span>
         <span className="flex-1 text-gray-700 truncate">{displayText}</span>
         {durationText && !isRunning && (
@@ -69,7 +71,10 @@ export function ToolCallCard({ toolCall }: Props) {
 
       {/* 展开态 */}
       {expanded && (
-        <div className="px-3 pb-2 pt-1 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+        <div
+          className="px-3 pb-2 pt-1 border-t border-gray-100 text-xs text-gray-500 space-y-1"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div>
             <span className="font-medium text-gray-600">工具: </span>
             {toolCall.toolName}
