@@ -21,6 +21,11 @@ export interface QuotedMessage {
   content: string;
 }
 
+// 内容片段：按实际发生顺序排列的文本和工具调用
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; toolCall: ToolCall };
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -28,6 +33,7 @@ export interface Message {
   content: string;
   createdAt: string;
   toolCalls?: ToolCall[];
+  contentParts?: ContentPart[];
   attachments?: FileAttachment[];
   quotedMessage?: QuotedMessage;
 }
