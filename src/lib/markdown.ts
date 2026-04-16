@@ -1,13 +1,5 @@
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
-import mermaid from 'mermaid';
-
-// 初始化 mermaid 配置
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-});
 
 function escapeHtml(str: string): string {
   return str

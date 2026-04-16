@@ -162,6 +162,32 @@ export function MessageList() {
                       if (part.type === 'tool_use') {
                         return <ToolCallCard key={part.toolCall.toolUseId} toolCall={part.toolCall} />;
                       }
+                      if (part.type === 'delegation_start') {
+                        return (
+                          <div key={`delegation-start-${partIdx}`} className="mb-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                            <div className="font-medium">已委派给子 Agent：{part.subAgentName || part.subAgentId || '未知 Agent'}</div>
+                            {part.task && <div className="mt-1 whitespace-pre-wrap text-blue-600">任务：{part.task}</div>}
+                          </div>
+                        );
+                      }
+                      if (part.type === 'delegation_delta' && part.content) {
+                        return (
+                          <div key={`delegation-delta-${partIdx}`} className="mb-2 rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-gray-700">
+                            <div className="mb-1 text-xs text-blue-600">
+                              {part.subAgentName || part.subAgentId || '子 Agent'} 执行中
+                            </div>
+                            <MessageContent content={part.content} isStreaming={isStreamingThis} />
+                          </div>
+                        );
+                      }
+                      if (part.type === 'delegation_end') {
+                        return (
+                          <div key={`delegation-end-${partIdx}`} className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                            <div className="font-medium">{part.subAgentName || part.subAgentId || '子 Agent'} 已完成</div>
+                            {part.result && <div className="mt-1 line-clamp-4 whitespace-pre-wrap text-emerald-700">{part.result}</div>}
+                          </div>
+                        );
+                      }
                       if (part.type === 'text' && part.text) {
                         const isLastTextPart = !msg.contentParts!.slice(partIdx + 1).some(p => p.type === 'text');
                         return <MessageContent key={`text-${partIdx}`} content={part.text} isStreaming={isStreamingThis && isLastTextPart} />;

@@ -307,9 +307,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       
       // Process messages: normalize attachments
       const processedList = list.map(msg => {
-        let updatedMsg = { ...msg };
+        const updatedMsg = { ...msg };
         if (updatedMsg.attachments && updatedMsg.attachments.length > 0) {
-          updatedMsg.attachments = updatedMsg.attachments.map((att: any, idx: number) => ({
+          updatedMsg.attachments = updatedMsg.attachments.map((att: Partial<FileAttachment>, idx: number) => ({
             id: att.id || `att-${idx}-${Date.now()}`,
             name: att.name || 'Unknown File',
             size: att.size || 0,
@@ -497,6 +497,74 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                         content: event.content,
                       },
                     ];
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'delegation_start': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = [...(last.contentParts || [])];
+                parts.push({
+                  type: 'delegation_start',
+                  subAgentId: event.subAgentId,
+                  subAgentName: event.subAgentName,
+                  task: event.task,
+                });
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'delegation_delta': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = [...(last.contentParts || [])];
+                const lastPart = parts[parts.length - 1];
+                if (
+                  lastPart &&
+                  lastPart.type === 'delegation_delta' &&
+                  lastPart.subAgentId === event.subAgentId
+                ) {
+                  parts[parts.length - 1] = {
+                    type: 'delegation_delta',
+                    subAgentId: event.subAgentId,
+                    subAgentName: event.subAgentName,
+                    content: (lastPart.content || '') + (event.content || ''),
+                  };
+                } else {
+                  parts.push({
+                    type: 'delegation_delta',
+                    subAgentId: event.subAgentId,
+                    subAgentName: event.subAgentName,
+                    content: event.content,
+                  });
+                }
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'delegation_end': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = [...(last.contentParts || [])];
+                parts.push({
+                  type: 'delegation_end',
+                  subAgentId: event.subAgentId,
+                  subAgentName: event.subAgentName,
+                  result: event.result,
+                });
                 msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
               return { messages: msgs };
@@ -721,6 +789,74 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                         content: event.content,
                       },
                     ];
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'delegation_start': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = [...(last.contentParts || [])];
+                parts.push({
+                  type: 'delegation_start',
+                  subAgentId: event.subAgentId,
+                  subAgentName: event.subAgentName,
+                  task: event.task,
+                });
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'delegation_delta': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = [...(last.contentParts || [])];
+                const lastPart = parts[parts.length - 1];
+                if (
+                  lastPart &&
+                  lastPart.type === 'delegation_delta' &&
+                  lastPart.subAgentId === event.subAgentId
+                ) {
+                  parts[parts.length - 1] = {
+                    type: 'delegation_delta',
+                    subAgentId: event.subAgentId,
+                    subAgentName: event.subAgentName,
+                    content: (lastPart.content || '') + (event.content || ''),
+                  };
+                } else {
+                  parts.push({
+                    type: 'delegation_delta',
+                    subAgentId: event.subAgentId,
+                    subAgentName: event.subAgentName,
+                    content: event.content,
+                  });
+                }
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'delegation_end': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = [...(last.contentParts || [])];
+                parts.push({
+                  type: 'delegation_end',
+                  subAgentId: event.subAgentId,
+                  subAgentName: event.subAgentName,
+                  result: event.result,
+                });
                 msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
               return { messages: msgs };

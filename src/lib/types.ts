@@ -25,7 +25,10 @@ export interface QuotedMessage {
 export type ContentPart =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; toolCall: ToolCall }
-  | { type: 'tool_result'; toolUseId: string; status: ToolCallStatus; content?: string };
+  | { type: 'tool_result'; toolUseId: string; status: ToolCallStatus; content?: string }
+  | { type: 'delegation_start'; subAgentId?: string; subAgentName?: string; task?: string }
+  | { type: 'delegation_delta'; subAgentId?: string; subAgentName?: string; content?: string }
+  | { type: 'delegation_end'; subAgentId?: string; subAgentName?: string; result?: string };
 
 export interface Message {
   id: string;
@@ -36,6 +39,34 @@ export interface Message {
   contentParts?: ContentPart[];
   attachments?: FileAttachment[];
   quotedMessage?: QuotedMessage;
+}
+
+export interface AgentProfile {
+  id: string;
+  agentType: 'main' | 'sub' | string;
+  type?: 'main' | 'sub' | string;
+  name: string;
+  description?: string;
+  delegationPrompt?: string;
+  avatarUrl?: string;
+  llmProvider?: string;
+  llmModel?: string;
+  llm?: {
+    provider?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+  temperature?: number;
+  maxTokens?: number;
+  systemPrompt?: string;
+  promptModules?: string[];
+  enabledBuiltinTools?: string[];
+  enabledMcpChannelNames?: string[];
+  enabledSkillNames?: string[];
+  priority: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // 工具调用
@@ -159,6 +190,9 @@ export type ChatEvent =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | { type: 'tool_use_input'; toolUseId: string; input: any }
   | { type: 'tool_result'; toolUseId: string; status: 'success' | 'error'; content?: string }
+  | { type: 'delegation_start'; subAgentId?: string; subAgentName?: string; task?: string }
+  | { type: 'delegation_delta'; subAgentId?: string; subAgentName?: string; content?: string }
+  | { type: 'delegation_end'; subAgentId?: string; subAgentName?: string; result?: string }
   | { type: 'artifact_created'; artifactId: string; artifactType: ArtifactType; title: string; language?: string; content?: string; url?: string; version: number }
   | { type: 'artifact_updated'; artifactId: string; version: number; content?: string; url?: string }
   | { type: 'stream_end'; usage?: { promptTokens: number; completionTokens: number } }

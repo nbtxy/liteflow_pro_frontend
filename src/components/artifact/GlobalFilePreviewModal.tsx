@@ -8,7 +8,24 @@ import { translations } from '@/lib/i18n/translations';
 import { downloadFileWithAuth, fetchFileContent, fetchFileBlobUrl } from '@/lib/fileUtils';
 import { toast } from '@/components/ui/Toast';
 import { md } from '@/lib/markdown';
-import mermaid from 'mermaid';
+
+let mermaidInitialized = false;
+
+async function renderMermaid(container: HTMLElement) {
+  const mermaid = (await import('mermaid')).default;
+  if (!mermaidInitialized) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+    });
+    mermaidInitialized = true;
+  }
+  await mermaid.run({
+    querySelector: '.mermaid',
+    nodes: container.querySelectorAll('.mermaid'),
+  });
+}
 
 export function GlobalFilePreviewModal() {
   const { previewFile, setPreviewFile, artifacts, currentConversationId } = useChatStore();
@@ -111,14 +128,11 @@ function FilePreviewContent({ file, artifacts, conversationId, t }: { file: File
   const artifactMarkdownHtml = React.useMemo(() => {
     if (file.type !== 'MARKDOWN' || !artifact?.content) return '';
     return md.render(artifact.content);
-  }, [artifact?.content, file.type]);
+  }, [artifact, file.type]);
 
   React.useEffect(() => {
     if (file.type === 'MARKDOWN' && file.artifactId && containerRef.current) {
-      mermaid.run({
-        querySelector: '.mermaid',
-        nodes: containerRef.current.querySelectorAll('.mermaid'),
-      }).catch(err => console.error('Mermaid render error', err));
+      renderMermaid(containerRef.current).catch(err => console.error('Mermaid render error', err));
     }
   }, [file.type, file.artifactId]);
 
@@ -285,10 +299,7 @@ function RemoteTextPreview({ conversationId, filePath, isMarkdown, t }: {
 
   React.useEffect(() => {
     if (isMarkdown && content && containerRef.current) {
-      mermaid.run({
-        querySelector: '.mermaid',
-        nodes: containerRef.current.querySelectorAll('.mermaid'),
-      }).catch(err => console.error('Mermaid render error', err));
+      renderMermaid(containerRef.current).catch(err => console.error('Mermaid render error', err));
     }
   }, [content, isMarkdown]);
 
