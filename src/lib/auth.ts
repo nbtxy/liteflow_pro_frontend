@@ -2,6 +2,14 @@ import { getApiUrl } from './config';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+type RefreshStatus = 'ok' | 'invalid' | 'unavailable';
+
+let refreshInFlight: Promise<RefreshResult> | null = null;
+
+export interface RefreshResult {
+  accessToken: string | null;
+  status: RefreshStatus;
+}
 
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -23,9 +31,11 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
-export async function refreshAccessToken(): Promise<string | null> {
+async function doRefreshAccessToken(): Promise<RefreshResult> {
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    return { accessToken: null, status: 'invalid' };
+  }
 
   try {
     const res = await fetch(getApiUrl('/api/auth/refresh'), {
@@ -34,24 +44,38 @@ export async function refreshAccessToken(): Promise<string | null> {
       body: JSON.stringify({ refreshToken }),
     });
     if (!res.ok) {
-      clearTokens();
-      return null;
+      if (res.status === 400 || res.status === 401) {
+        clearTokens();
+        return { accessToken: null, status: 'invalid' };
+      }
+      return { accessToken: null, status: 'unavailable' };
     }
     const json = await res.json();
     if (json.code !== 200) {
-      clearTokens();
-      return null;
+      if (json.code === 40101 || json.code === 40102) {
+        clearTokens();
+        return { accessToken: null, status: 'invalid' };
+      }
+      return { accessToken: null, status: 'unavailable' };
     }
     const data = json.data;
     localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
     if (data.refreshToken) {
       localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
     }
-    return data.accessToken;
+    return { accessToken: data.accessToken, status: 'ok' };
   } catch {
-    clearTokens();
-    return null;
+    return { accessToken: null, status: 'unavailable' };
   }
+}
+
+export async function refreshAccessToken(): Promise<RefreshResult> {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefreshAccessToken().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
 }
 
 export function isAuthenticated(): boolean {

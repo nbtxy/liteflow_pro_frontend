@@ -23,9 +23,12 @@ export async function* regenerateChat(
   });
 
   if (res.status === 401) {
-    token = await refreshAccessToken();
+    const refreshed = await refreshAccessToken();
+    token = refreshed.accessToken;
     if (!token) {
-      window.location.href = '/login';
+      if (refreshed.status === 'invalid') {
+        window.location.href = '/login';
+      }
       return;
     }
     res = await fetch(url, {
@@ -109,9 +112,12 @@ export async function* streamChat(
   });
 
   if (res.status === 401) {
-    token = await refreshAccessToken();
+    const refreshed = await refreshAccessToken();
+    token = refreshed.accessToken;
     if (!token) {
-      window.location.href = '/login';
+      if (refreshed.status === 'invalid') {
+        window.location.href = '/login';
+      }
       return;
     }
     res = await fetch(url, {

@@ -18,11 +18,16 @@ export async function apiFetch<T = unknown>(path: string, options: RequestInit =
 
     // accessToken 过期 → 自动刷新 → 重试一次
     if (res.status === 401) {
-      token = await refreshAccessToken();
+      const refreshed = await refreshAccessToken();
+      token = refreshed.accessToken;
       if (!token) {
-        toast.error('登录已过期，请重新登录');
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
+        if (refreshed.status === 'invalid') {
+          toast.error('登录已过期，请重新登录');
+          window.location.href = '/login';
+          throw new Error('Unauthorized');
+        }
+        toast.error('登录状态刷新失败，请稍后重试');
+        throw new Error('RefreshUnavailable');
       }
 
       res = await fetch(url, {
@@ -33,6 +38,12 @@ export async function apiFetch<T = unknown>(path: string, options: RequestInit =
           ...options.headers,
         },
       });
+
+      if (res.status === 401) {
+        toast.error('登录已过期，请重新登录');
+        window.location.href = '/login';
+        throw new Error('Unauthorized');
+      }
     }
 
     if (!res.ok) {
