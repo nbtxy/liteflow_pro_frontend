@@ -44,7 +44,7 @@ export function GlobalFilePreviewModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all" onClick={() => setPreviewFile(null)}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 transition-all" onClick={() => setPreviewFile(null)}>
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
@@ -104,6 +104,14 @@ function getFileIcon(type: string): string {
 
 function FilePreviewContent({ file, artifacts, conversationId, t }: { file: FileItem; artifacts: Artifact[]; conversationId: string | null; t: typeof translations.en }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const artifact = React.useMemo(
+    () => (file.artifactId ? artifacts.find(a => a.id === file.artifactId) : undefined),
+    [artifacts, file.artifactId]
+  );
+  const artifactMarkdownHtml = React.useMemo(() => {
+    if (file.type !== 'MARKDOWN' || !artifact?.content) return '';
+    return md.render(artifact.content);
+  }, [artifact?.content, file.type]);
 
   React.useEffect(() => {
     if (file.type === 'MARKDOWN' && file.artifactId && containerRef.current) {
@@ -116,14 +124,13 @@ function FilePreviewContent({ file, artifacts, conversationId, t }: { file: File
 
   // 优先用 artifact 内存内容
   if (file.artifactId) {
-    const artifact = artifacts.find(a => a.id === file.artifactId);
     if (artifact?.content) {
       if (file.type === 'MARKDOWN') {
         return (
-          <div className="p-6 h-full overflow-auto bg-white" ref={containerRef}>
+          <div className="p-6 h-full bg-white" ref={containerRef}>
             <div 
               className="prose prose-slate max-w-none mx-auto markdown-body"
-              dangerouslySetInnerHTML={{ __html: md.render(artifact.content) }}
+              dangerouslySetInnerHTML={{ __html: artifactMarkdownHtml }}
             />
           </div>
         );
@@ -259,6 +266,10 @@ function RemoteTextPreview({ conversationId, filePath, isMarkdown, t }: {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const markdownHtml = React.useMemo(() => {
+    if (!isMarkdown || content === null) return '';
+    return md.render(content);
+  }, [content, isMarkdown]);
 
   React.useEffect(() => {
     fetchFileContent(conversationId, filePath)
@@ -297,10 +308,10 @@ function RemoteTextPreview({ conversationId, filePath, isMarkdown, t }: {
 
   if (isMarkdown) {
     return (
-      <div className="p-6 h-full overflow-auto bg-white" ref={containerRef}>
+      <div className="p-6 h-full bg-white" ref={containerRef}>
         <div 
           className="prose prose-slate max-w-none mx-auto markdown-body"
-          dangerouslySetInnerHTML={{ __html: md.render(content) }}
+          dangerouslySetInnerHTML={{ __html: markdownHtml }}
         />
       </div>
     );

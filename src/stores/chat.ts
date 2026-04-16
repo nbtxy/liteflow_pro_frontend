@@ -311,7 +311,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         if (updatedMsg.attachments && updatedMsg.attachments.length > 0) {
           updatedMsg.attachments = updatedMsg.attachments.map((att: any, idx: number) => ({
             id: att.id || `att-${idx}-${Date.now()}`,
-            name: att.name || att.fileName || 'Unknown File',
+            name: att.name || 'Unknown File',
             size: att.size || 0,
             status: att.status || 'done',
             progress: att.progress || 100,

@@ -94,7 +94,7 @@ export async function* streamChat(
     type: att.type || 'file',
     url: att.url,
     mimeType: att.mimeType,
-    fileName: att.name,
+    name: att.name,
     size: att.size,
   }));
 
