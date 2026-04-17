@@ -189,6 +189,7 @@ export type ChatEvent =
   | { type: 'tool_use_start'; toolUseId: string; toolName: string }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | { type: 'tool_use_input'; toolUseId: string; input: any }
+  | { type: 'tool_use_input_delta'; toolUseId: string; input_delta: string }
   | { type: 'tool_result'; toolUseId: string; status: 'success' | 'error'; content?: string }
   | { type: 'delegation_start'; subAgentId?: string; subAgentName?: string; task?: string }
   | { type: 'delegation_delta'; subAgentId?: string; subAgentName?: string; content?: string }

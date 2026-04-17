@@ -445,7 +445,33 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
                 const parts = [...(last.contentParts || [])];
-                parts.push({ type: 'tool_use', toolCall });
+                const exists = parts.some(
+                  p => p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
+                );
+                if (!exists) {
+                  parts.push({ type: 'tool_use', toolCall });
+                }
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'tool_use_input_delta': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = (last.contentParts || []).map(p => {
+                  if (p.type !== 'tool_use' || p.toolCall.toolUseId !== event.toolUseId) {
+                    return p;
+                  }
+                  const prev = typeof p.toolCall.input === 'string' ? p.toolCall.input : '';
+                  return {
+                    type: 'tool_use' as const,
+                    toolCall: { ...p.toolCall, input: prev + (event.input_delta || '') },
+                  };
+                });
                 msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
               return { messages: msgs };
@@ -737,7 +763,33 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'assistant') {
                 const parts = [...(last.contentParts || [])];
-                parts.push({ type: 'tool_use', toolCall });
+                const exists = parts.some(
+                  p => p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
+                );
+                if (!exists) {
+                  parts.push({ type: 'tool_use', toolCall });
+                }
+                msgs[msgs.length - 1] = { ...last, contentParts: parts };
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case 'tool_use_input_delta': {
+            set((state) => {
+              const msgs = [...state.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'assistant') {
+                const parts = (last.contentParts || []).map(p => {
+                  if (p.type !== 'tool_use' || p.toolCall.toolUseId !== event.toolUseId) {
+                    return p;
+                  }
+                  const prev = typeof p.toolCall.input === 'string' ? p.toolCall.input : '';
+                  return {
+                    type: 'tool_use' as const,
+                    toolCall: { ...p.toolCall, input: prev + (event.input_delta || '') },
+                  };
+                });
                 msgs[msgs.length - 1] = { ...last, contentParts: parts };
               }
               return { messages: msgs };

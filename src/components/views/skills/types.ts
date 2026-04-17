@@ -15,7 +15,6 @@ export interface SkillItem {
   installedAt?: string;
   compat?: CompatInfo;
   installed?: boolean;
-  sourceUrl?: string;
   skillContent?: string;
 }
 

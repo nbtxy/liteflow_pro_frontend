@@ -14,13 +14,19 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
   const { locale, setLocale, t } = useLanguage();
   const resetChatState = useChatStore((s) => s.resetChatState);
   const [langSubOpen, setLangSubOpen] = useState(false);
+  const [profile, setProfile] = useState<{ name?: string | null; phone?: string | null } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = sessionStorage.getItem('liteflow_user_profile');
+      return raw ? (JSON.parse(raw) as { name?: string | null; phone?: string | null }) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  // Mock user data
-  const user = {
-    name: 'LiteFlow User',
-    email: 'user@liteflow.pro',
-    avatar: 'L'
-  };
+  const userName = profile?.name?.trim() || profile?.phone || 'LiteFlow User';
+  const userSubText = profile?.phone || '';
+  const userAvatar = userName.charAt(0).toUpperCase();
 
   // 点击外部关闭面板
   useEffect(() => {
@@ -33,8 +39,22 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const syncFromCache = () => {
+      try {
+        const raw = sessionStorage.getItem('liteflow_user_profile');
+        setProfile(raw ? (JSON.parse(raw) as { name?: string | null; phone?: string | null }) : null);
+      } catch {
+        setProfile(null);
+      }
+    };
+    window.addEventListener('storage', syncFromCache);
+    return () => window.removeEventListener('storage', syncFromCache);
+  }, []);
+
   const handleLogout = () => {
     resetChatState();
+    sessionStorage.removeItem('liteflow_user_profile');
     clearTokens();
     toast.success(t.common.loggedOut);
     router.push('/login');
@@ -46,8 +66,23 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
       {isOpen && (
         <div className={`absolute bottom-[calc(100%-8px)] ${isCollapsed ? 'left-3 w-56' : 'left-3 right-3'} bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200`}>
           <div className="px-4 py-3 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-            <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  router.push('/onboarding/username');
+                }}
+                aria-label={t.common.editUsername}
+                title={t.common.editUsername}
+                className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.232-6.232a2.5 2.5 0 113.536 3.536L12.536 14.536a4 4 0 01-1.414.943L8 16l.521-3.122A4 4 0 019 11z" />
+                </svg>
+              </button>
+            </div>
+            {userSubText && <p className="text-xs text-gray-500 truncate mt-0.5">{userSubText}</p>}
           </div>
           
           <div className="py-1 border-b border-gray-100">
@@ -123,15 +158,15 @@ export function UserMenu({ isCollapsed }: { isCollapsed?: boolean }) {
         className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 px-2'} py-2 rounded-lg transition-colors ${
           isOpen ? 'bg-gray-200' : 'hover:bg-gray-200/50'
         }`}
-        title={isCollapsed ? user.name : undefined}
+        title={isCollapsed ? userName : undefined}
       >
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-white flex items-center justify-center font-medium shadow-sm shrink-0">
-          {user.avatar}
+          {userAvatar}
         </div>
         {!isCollapsed && (
           <>
             <div className="flex-1 text-left min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
             </div>
             <svg 
               className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 

@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { SkillItem } from './types';
-import { apiFetch } from '@/lib/api';
 import { md } from '@/lib/markdown';
-import { Spinner } from '@/components/ui/Spinner';
 import { CompatBadge } from './CompatBadge';
 
 interface Props {
@@ -11,35 +9,10 @@ interface Props {
 }
 
 export function SkillDetailDialog({ skill, onClose }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [contentHtml, setContentHtml] = useState<string>('');
   const isGlobal = true;
-
-  useEffect(() => {
-    // Fetch skill detail
-    const fetchDetail = async () => {
-      setLoading(true);
-      try {
-        let detail: { skillContent?: string } | null = null;
-        // GET /api/skills/{name} per API spec
-        detail = await apiFetch<{ skillContent?: string }>(`/api/skills/${encodeURIComponent(skill.name)}`).catch(() => null);
-
-        if (detail?.skillContent) {
-          setContentHtml(md.render(detail.skillContent));
-        } else if (skill.skillContent) {
-          setContentHtml(md.render(skill.skillContent));
-        } else {
-          // mock some content
-          setContentHtml(md.render(`# ${skill.name}\n\n${skill.description}\n\n> 提示：这是模拟的技能详情内容。`));
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDetail();
-  }, [skill]);
+  const description = (skill.description || '').trim() || '暂无描述';
+  const contentMarkdown = (skill.skillContent || '').trim() || `# ${skill.name}\n\n${description}`;
+  const contentHtml = md.render(contentMarkdown);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -67,7 +40,7 @@ export function SkillDetailDialog({ skill, onClose }: Props) {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
           <div className="text-gray-700 text-lg mb-4">
-             {skill.description}
+             {description}
           </div>
 
           <div className="grid grid-cols-2 gap-y-3 text-sm text-gray-600 bg-gray-50 p-4 rounded-xl">
@@ -77,10 +50,6 @@ export function SkillDetailDialog({ skill, onClose }: Props) {
                 <div className="font-medium text-gray-900">{skill.author}</div>
               </>
             )}
-            <div className="text-gray-400">来源</div>
-            <div className="font-medium text-gray-900 truncate" title={skill.sourceUrl || `clawhub.ai/${skill.slug || skill.name}`}>
-              {skill.sourceUrl || `clawhub.ai/${skill.slug || skill.name}`}
-            </div>
             <div className="text-gray-400">类型</div>
             <div className="font-medium text-gray-900">
               {isGlobal ? '全局技能（管理员安装）' : '个人技能'}
@@ -118,7 +87,7 @@ export function SkillDetailDialog({ skill, onClose }: Props) {
                 {skill.compat.level === 'INCOMPATIBLE' ? '❌ 不兼容' : '⚠️ 部分兼容'}
               </h4>
               <ul className="list-disc pl-5 text-sm space-y-1 text-gray-700">
-                {skill.compat.issues.map((issue, idx) => (
+                {(skill.compat.issues || []).map((issue, idx) => (
                   <li key={idx}>{issue}</li>
                 ))}
               </ul>
@@ -137,13 +106,7 @@ export function SkillDetailDialog({ skill, onClose }: Props) {
 
           <div className="space-y-3">
             <h3 className="font-medium text-gray-900 border-b pb-2">技能内容</h3>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Spinner className="w-6 h-6 text-teal-600" />
-              </div>
-            ) : (
-              <div className="message-content prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: contentHtml }} />
-            )}
+            <div className="message-content prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: contentHtml }} />
           </div>
 
         </div>

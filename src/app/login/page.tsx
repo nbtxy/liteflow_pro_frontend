@@ -86,6 +86,10 @@ export default function LoginPage() {
       const data = json.data;
       setTokens(data.accessToken, data.refreshToken);
       resetChatState();
+      if (data.isNewUser) {
+        router.replace('/onboarding/username');
+        return;
+      }
       router.replace('/chat');
     } catch {
       setError(t.login.networkError);

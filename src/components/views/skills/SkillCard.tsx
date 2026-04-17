@@ -23,6 +23,7 @@ interface Props {
 
 export function SkillCard({ skill, showUninstall, onClick, onUninstall, onInstall, isDiscover }: Props) {
   const meta = SKILL_META[skill.name] || { icon: '📦', color: 'bg-gray-50 text-gray-700' };
+  const description = (skill.description || '').trim() || '暂无描述';
 
   return (
     <div
@@ -42,8 +43,8 @@ export function SkillCard({ skill, showUninstall, onClick, onUninstall, onInstal
             <div className="text-xs text-gray-400 mb-1 truncate">{skill.slug}</div>
           )}
 
-          <p className="text-sm text-gray-500 leading-relaxed line-clamp-2" title={skill.description}>
-            {skill.description}
+          <p className="text-sm text-gray-500 leading-relaxed line-clamp-2" title={description}>
+            {description}
           </p>
         </div>
       </div>

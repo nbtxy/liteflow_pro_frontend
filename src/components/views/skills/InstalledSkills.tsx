@@ -1,4 +1,3 @@
-import React from 'react';
 import { SkillItem } from './types';
 import { SkillCard } from './SkillCard';
 
@@ -11,7 +10,7 @@ export function InstalledSkills({ skills, onView }: Props) {
   return (
     <div>
       <h3 className="text-sm font-medium text-gray-500 mb-4">内置技能</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="space-y-3">
         {skills.map(skill => (
           <SkillCard
             key={skill.slug || skill.name}

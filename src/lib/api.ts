@@ -47,7 +47,8 @@ export async function apiFetch<T = unknown>(path: string, options: RequestInit =
     }
 
     if (!res.ok) {
-      toast.error(`请求失败: ${res.status}`);
+      const errorBody = await res.json().catch(() => null);
+      toast.error(errorBody?.message || `请求失败: ${res.status}`);
       throw new Error(`HTTP Error: ${res.status}`);
     }
 
