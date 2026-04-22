@@ -1,6 +1,13 @@
-import { getAccessToken, refreshAccessToken } from './auth';
+import { clearTokens, getAccessToken, refreshAccessToken } from './auth';
 import { toast } from '@/components/ui/Toast';
 import { getApiUrl } from './config';
+
+function handleForceLogoutIfUserMissing(message?: string) {
+  if (message !== 'failed to get user') return;
+  clearTokens();
+  toast.error('登录状态异常，请重新登录');
+  window.location.href = '/login';
+}
 
 export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   let token = getAccessToken();
@@ -48,12 +55,14 @@ export async function apiFetch<T = unknown>(path: string, options: RequestInit =
 
     if (!res.ok) {
       const errorBody = await res.json().catch(() => null);
+      handleForceLogoutIfUserMissing(errorBody?.message);
       toast.error(errorBody?.message || `请求失败: ${res.status}`);
       throw new Error(`HTTP Error: ${res.status}`);
     }
 
     const json = await res.json();
     if (json.code !== 200) {
+      handleForceLogoutIfUserMissing(json.message);
       toast.error(json.message || '请求失败');
       throw new Error(json.message || '请求失败');
     }

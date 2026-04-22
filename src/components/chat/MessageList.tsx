@@ -23,12 +23,18 @@ export function MessageList() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasInitialScrollDoneRef = useRef(false);
   const [userScrolled, setUserScrolled] = useState(false);
 
   // 自动滚动
   useEffect(() => {
     if (!userScrolled) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current?.scrollIntoView({
+        behavior: hasInitialScrollDoneRef.current ? 'smooth' : 'auto',
+      });
+      if (!hasInitialScrollDoneRef.current) {
+        hasInitialScrollDoneRef.current = true;
+      }
     }
   }, [messages, userScrolled]);
 
@@ -121,6 +127,18 @@ export function MessageList() {
           const isLast = idx === messages.length - 1;
           const isAssistant = msg.role === 'assistant';
           const isStreamingThis = isLast && isAssistant && isStreaming;
+          const assistantText = isAssistant
+            ? (msg.contentParts || [])
+                .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+                .map((part) => part.text)
+                .join('')
+            : '';
+          const userText = !isAssistant
+            ? (msg.contentParts || [])
+                .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+                .map((part) => part.text)
+                .join('')
+            : '';
 
           return (
             <div key={msg.id} className={`flex ${isAssistant ? 'justify-start' : 'justify-end'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
@@ -210,10 +228,10 @@ export function MessageList() {
                     })}
 
                     {/* Artifact 引用标签 */}
-                    {!isStreaming && artifacts.length > 0 && msg.content && (
+                    {!isStreaming && artifacts.length > 0 && assistantText && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {artifacts
-                          .filter(a => msg.content.includes(a.title))
+                          .filter(a => assistantText.includes(a.title))
                           .map(a => (
                             <button
                               key={a.id}
@@ -232,7 +250,7 @@ export function MessageList() {
                   </>
                 ) : (
                   <div className="relative group">
-                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm">{msg.content}</div>
+                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm">{userText}</div>
                     {!isStreaming && (
                       <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -240,7 +258,7 @@ export function MessageList() {
                             setQuotedMessage({
                               id: msg.id,
                               role: msg.role,
-                              content: buildQuotedPreview(msg.content),
+                              content: buildQuotedPreview(userText),
                             });
                           }}
                           className="p-1 text-gray-400 hover:text-teal-600"
@@ -256,7 +274,7 @@ export function MessageList() {
                 )}
 
                 {/* Assistant 消息操作栏 */}
-                {isAssistant && !isStreaming && msg.content && (
+                {isAssistant && !isStreaming && assistantText && (
                   <div className={`absolute left-1 flex items-center gap-2 ${isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
                       onClick={() => handleFeedback(msg.id, 'up')}
@@ -285,7 +303,7 @@ export function MessageList() {
                       </svg>
                     </button>
                     <button
-                      onClick={() => navigator.clipboard.writeText(msg.content)}
+                      onClick={() => navigator.clipboard.writeText(assistantText)}
                       className="p-1 text-gray-400 hover:text-teal-500 transition-colors"
                       title="复制"
                     >
@@ -298,7 +316,7 @@ export function MessageList() {
                         setQuotedMessage({
                           id: msg.id,
                           role: msg.role,
-                          content: buildQuotedPreview(msg.content),
+                          content: buildQuotedPreview(assistantText),
                         });
                       }}
                       className="p-1 text-gray-400 hover:text-teal-500 transition-colors"

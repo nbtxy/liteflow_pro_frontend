@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         id: assistantMessageId,
         conversationId: conversationId,
         role: 'assistant',
-        content: assistantContent,
+        contentParts: [{ type: 'text', text: assistantContent }],
         createdAt: new Date().toISOString(),
       });
 

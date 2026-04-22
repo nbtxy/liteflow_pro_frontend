@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     id: `msg-${Date.now()}`,
     conversationId: convId,
     role: 'user',
-    content: message,
+    contentParts: [{ type: 'text', text: message }],
     createdAt: new Date().toISOString(),
   });
 
@@ -215,7 +215,7 @@ export async function POST(request: Request) {
         id: assistantMessageId,
         conversationId: convId,
         role: 'assistant',
-        content: assistantContent,
+        contentParts: [{ type: 'text', text: assistantContent }],
         createdAt: new Date().toISOString(),
       });
 

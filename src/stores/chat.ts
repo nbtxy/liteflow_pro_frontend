@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment, QuotedMessage } from '@/lib/types';
+import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment, QuotedMessage, ContentPart } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
 import { streamChat, regenerateChat } from '@/lib/sse';
 import { toast } from '@/components/ui/Toast';
@@ -14,6 +14,17 @@ const getT = () => {
   }
   return translations.en;
 };
+
+const withAssistantParts = (msg: Message, parts: ContentPart[]): Message => ({
+  ...msg,
+  contentParts: parts,
+});
+
+const extractMessageText = (parts?: ContentPart[]) =>
+  (parts || [])
+    .filter((part): part is Extract<ContentPart, { type: 'text'; text: string }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('');
 
 interface ChatStore {
   // 会话
@@ -353,7 +364,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         id: `temp-${Date.now()}`,
         conversationId: context.currentConversationId ?? '',
         role: 'user',
-        content,
+        contentParts: [{ type: 'text', text: content }],
         createdAt: new Date().toISOString(),
         attachments: context.doneAttachments.length > 0 ? context.doneAttachments : undefined,
         quotedMessage: context.quotedMessage ?? undefined,
@@ -408,7 +419,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               id: assistantMessageId,
               conversationId: newConversationId ?? '',
               role: 'assistant',
-              content: '',
               createdAt: new Date().toISOString(),
               contentParts: [],
             };
@@ -427,7 +437,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 } else {
                   parts.push({ type: 'text', text: event.content });
                 }
-                msgs[msgs.length - 1] = { ...last, content: last.content + event.content, contentParts: parts };
+                msgs[msgs.length - 1] = withAssistantParts(last, parts);
               }
               return { messages: msgs };
             });
@@ -643,14 +653,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             set((state) => {
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
+              const warningText = `\n\n⚠️ ${event.message}`;
               if (last && last.role === 'assistant') {
-                msgs[msgs.length - 1] = { ...last, content: last.content + `\n\n⚠️ ${event.message}` };
+                const parts = [...(last.contentParts || [])];
+                const lastPart = parts[parts.length - 1];
+                if (lastPart && lastPart.type === 'text') {
+                  parts[parts.length - 1] = { type: 'text', text: lastPart.text + warningText };
+                } else {
+                  parts.push({ type: 'text', text: warningText });
+                }
+                msgs[msgs.length - 1] = withAssistantParts(last, parts);
               } else {
                 msgs.push({
                   id: `error-${Date.now()}`,
                   conversationId: newConversationId ?? '',
                   role: 'assistant',
-                  content: `⚠️ ${event.message}`,
+                  contentParts: [{ type: 'text', text: `⚠️ ${event.message}` }],
                   createdAt: new Date().toISOString(),
                 });
               }
@@ -713,7 +731,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ? regenerateChat(currentConversationId, assistantMessageIdToRegenerate, abortController.signal)
         : streamChat(
             currentConversationId,
-            lastUser.content,
+            extractMessageText(lastUser.contentParts),
             lastUser.attachments,
             lastUser.quotedMessage,
             abortController.signal
@@ -726,7 +744,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               id: event.messageId,
               conversationId: currentConversationId,
               role: 'assistant',
-              content: '',
               createdAt: new Date().toISOString(),
               contentParts: [],
             };
@@ -745,7 +762,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 } else {
                   parts.push({ type: 'text', text: event.content });
                 }
-                msgs[msgs.length - 1] = { ...last, content: last.content + event.content, contentParts: parts };
+                msgs[msgs.length - 1] = withAssistantParts(last, parts);
               }
               return { messages: msgs };
             });
@@ -960,14 +977,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             set((state) => {
               const msgs = [...state.messages];
               const last = msgs[msgs.length - 1];
+              const warningText = `\n\n⚠️ ${event.message}`;
               if (last && last.role === 'assistant') {
-                msgs[msgs.length - 1] = { ...last, content: last.content + `\n\n⚠️ ${event.message}` };
+                const parts = [...(last.contentParts || [])];
+                const lastPart = parts[parts.length - 1];
+                if (lastPart && lastPart.type === 'text') {
+                  parts[parts.length - 1] = { type: 'text', text: lastPart.text + warningText };
+                } else {
+                  parts.push({ type: 'text', text: warningText });
+                }
+                msgs[msgs.length - 1] = withAssistantParts(last, parts);
               } else {
                 msgs.push({
                   id: `error-${Date.now()}`,
                   conversationId: currentConversationId,
                   role: 'assistant',
-                  content: `⚠️ ${event.message}`,
+                  contentParts: [{ type: 'text', text: `⚠️ ${event.message}` }],
                   createdAt: new Date().toISOString(),
                 });
               }
