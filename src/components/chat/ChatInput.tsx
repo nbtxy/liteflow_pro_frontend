@@ -3,8 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useChatStore } from '@/stores/chat';
 import { toast } from '@/components/ui/Toast';
-import { getAccessToken } from '@/lib/auth';
-import { getApiUrl } from '@/lib/config';
+import { uploadConversationFile } from '@/lib/fileUtils';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const BLOCKED_EXTENSIONS = ['.exe', '.bat', '.cmd', '.com', '.msi', '.scr', '.pif'];
@@ -102,47 +101,18 @@ export function ChatInput() {
       }
 
       const convIdStr = String(convId);
-      const token = getAccessToken();
-      const xhr = new XMLHttpRequest();
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const url = getApiUrl(`/api/conversations/${convIdStr}/files`);
-      xhr.open('POST', url);
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      }
-
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const progress = Math.round((e.loaded / e.total) * 100);
+      const uploaded = await uploadConversationFile({
+        conversationId: convIdStr,
+        file,
+        onProgress: (progress) => {
           updatePendingAttachment(attachmentId, { progress });
-        }
-      };
+        },
+      });
 
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          let uploadedPath: string | undefined;
-          try {
-            const payload = JSON.parse(xhr.responseText) as { data?: { path?: string } };
-            uploadedPath = payload?.data?.path;
-          } catch {}
-          updatePendingAttachment(attachmentId, { status: 'done', progress: 100, url: uploadedPath });
-          toast.success(`${file.name} 上传成功`);
-          setArtifactPanelOpen(true);
-          loadFiles(convIdStr);
-        } else {
-          updatePendingAttachment(attachmentId, { status: 'error' });
-          toast.error(`${file.name} 上传失败`);
-        }
-      };
-
-      xhr.onerror = () => {
-        updatePendingAttachment(attachmentId, { status: 'error' });
-        toast.error(`${file.name} 上传失败`);
-      };
-
-      xhr.send(formData);
+      updatePendingAttachment(attachmentId, { status: 'done', progress: 100, url: uploaded.path });
+      toast.success(`${file.name} 上传成功`);
+      setArtifactPanelOpen(true);
+      loadFiles(convIdStr);
     } catch {
       updatePendingAttachment(attachmentId, { status: 'error' });
       toast.error(`${file.name} 上传失败`);

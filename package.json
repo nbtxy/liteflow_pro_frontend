@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "ali-oss": "^6.23.0",
     "cronstrue": "^3.14.0",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.1",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/ali-oss": "^6.23.3",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20",
     "@types/react": "^19",
