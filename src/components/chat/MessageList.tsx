@@ -162,6 +162,20 @@ export function MessageList() {
                       if (part.type === 'tool_use') {
                         return <ToolCallCard key={part.toolCall.toolUseId} toolCall={part.toolCall} />;
                       }
+                      if (part.type === 'tool_result' && part.content) {
+                        return (
+                          <div
+                            key={`tool-result-${part.toolUseId}`}
+                            className={`mb-2 rounded-lg border px-3 py-2 text-sm ${
+                              part.status === 'error'
+                                ? 'border-red-100 bg-red-50/50 text-red-800'
+                                : 'border-gray-100 bg-gray-50/30 text-gray-700'
+                            }`}
+                          >
+                            <MessageContent content={part.content} isStreaming={false} />
+                          </div>
+                        );
+                      }
                       if (part.type === 'delegation_start') {
                         return (
                           <div key={`delegation-start-${partIdx}`} className="mb-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
