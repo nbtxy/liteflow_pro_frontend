@@ -125,7 +125,7 @@ export function MessageList() {
           return (
             <div key={msg.id} className={`flex ${isAssistant ? 'justify-start' : 'justify-end'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
               <div
-                className={`relative group max-w-[85%] ${
+                className={`relative group max-w-[85%] break-words [overflow-wrap:anywhere] ${
                   isAssistant
                     ? 'px-2 pb-8 text-gray-800'
                     : 'rounded-2xl px-4 py-3 bg-teal-600 text-white'
@@ -232,7 +232,7 @@ export function MessageList() {
                   </>
                 ) : (
                   <div className="relative group">
-                    <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm">{msg.content}</div>
                     {!isStreaming && (
                       <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
