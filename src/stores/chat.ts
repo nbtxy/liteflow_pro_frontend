@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, Conversation, ToolCall, Artifact, FileItem, FileAttachment, QuotedMessage, ContentPart } from '@/lib/types';
+import type { Message, Conversation, ToolCall, ToolCallStatus, Artifact, FileItem, FileAttachment, QuotedMessage, ContentPart, ChatEvent } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
 import { streamChat, regenerateChat } from '@/lib/sse';
 import { toast } from '@/components/ui/Toast';
@@ -25,6 +25,113 @@ const extractMessageText = (parts?: ContentPart[]) =>
     .filter((part): part is Extract<ContentPart, { type: 'text'; text: string }> => part.type === 'text')
     .map((part) => part.text)
     .join('');
+
+const normalizeListResponse = <T>(data: unknown): T[] => {
+  if (Array.isArray(data)) {
+    return data as T[];
+  }
+  const record = (data as Record<string, unknown>) || {};
+  const list = record.content ?? record.items ?? record.data ?? [];
+  return Array.isArray(list) ? (list as T[]) : [];
+};
+
+const settleRunningToolCalls = (
+  messages: Message[],
+  status: Exclude<ToolCallStatus, 'running'> = 'error'
+): Message[] => {
+  let changed = false;
+  const now = Date.now();
+
+  const nextMessages = messages.map((msg) => {
+    if (!msg.contentParts || msg.contentParts.length === 0) {
+      return msg;
+    }
+
+    let messageChanged = false;
+    const nextParts = msg.contentParts.map((part) => {
+      if (part.type !== 'tool_use' || part.toolCall.status !== 'running') {
+        return part;
+      }
+
+      messageChanged = true;
+      changed = true;
+      return {
+        type: 'tool_use' as const,
+        toolCall: {
+          ...part.toolCall,
+          status,
+          duration: part.toolCall.duration ?? Math.max(0, now - part.toolCall.startedAt),
+        },
+      };
+    });
+
+    return messageChanged ? { ...msg, contentParts: nextParts } : msg;
+  });
+
+  return changed ? nextMessages : messages;
+};
+
+const reconcileToolStatusFromResults = (parts?: ContentPart[]): ContentPart[] | undefined => {
+  if (!parts || parts.length === 0) {
+    return parts;
+  }
+
+  const statusByToolUseId = new Map<string, Exclude<ToolCallStatus, 'running'>>();
+  for (const part of parts) {
+    if (part.type === 'tool_result' && part.status !== 'running') {
+      statusByToolUseId.set(part.toolUseId, part.status);
+    }
+  }
+  if (statusByToolUseId.size === 0) {
+    return parts;
+  }
+
+  let changed = false;
+  const nextParts = parts.map((part) => {
+    if (part.type !== 'tool_use') {
+      return part;
+    }
+
+    const settledStatus = statusByToolUseId.get(part.toolCall.toolUseId);
+    if (!settledStatus || part.toolCall.status === settledStatus) {
+      return part;
+    }
+
+    changed = true;
+    return {
+      type: 'tool_use' as const,
+      toolCall: {
+        ...part.toolCall,
+        status: settledStatus,
+      },
+    };
+  });
+
+  return changed ? nextParts : parts;
+};
+
+const normalizeMessageForRender = (msg: Message): Message => {
+  const updatedMsg = { ...msg };
+
+  if (updatedMsg.attachments && updatedMsg.attachments.length > 0) {
+    updatedMsg.attachments = updatedMsg.attachments.map((att: Partial<FileAttachment>, idx: number) => ({
+      id: att.id || `att-${idx}-${Date.now()}`,
+      name: att.name || 'Unknown File',
+      size: att.size || 0,
+      status: att.status || 'done',
+      progress: att.progress || 100,
+      url: att.url,
+      type: att.type,
+      mimeType: att.mimeType,
+    }));
+  }
+
+  if (updatedMsg.contentParts && updatedMsg.contentParts.length > 0) {
+    updatedMsg.contentParts = reconcileToolStatusFromResults(updatedMsg.contentParts);
+  }
+
+  return updatedMsg;
+};
 
 interface ChatStore {
   // 会话
@@ -109,6 +216,286 @@ interface ChatStore {
   resetChatState: () => void;
 }
 
+type ChatStoreSet = (
+  partial: Partial<ChatStore> | ((state: ChatStore) => Partial<ChatStore> | ChatStore)
+) => void;
+
+interface StreamEventContext {
+  set: ChatStoreSet;
+  conversationIdRef: { current: string };
+  onStreamStart?: (event: Extract<ChatEvent, { type: 'stream_start' }>) => void;
+}
+
+const applyStreamEvent = (event: ChatEvent, context: StreamEventContext) => {
+  const { set, conversationIdRef, onStreamStart } = context;
+
+  switch (event.type) {
+    case 'stream_start': {
+      onStreamStart?.(event);
+      const assistantMessage: Message = {
+        id: event.messageId,
+        conversationId: conversationIdRef.current,
+        role: 'assistant',
+        createdAt: new Date().toISOString(),
+        contentParts: [],
+      };
+      set((state) => ({ messages: [...state.messages, assistantMessage] }));
+      break;
+    }
+    case 'text_delta': {
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const parts = [...(last.contentParts || [])];
+          const lastPart = parts[parts.length - 1];
+          if (lastPart && lastPart.type === 'text') {
+            parts[parts.length - 1] = { type: 'text', text: lastPart.text + event.content };
+          } else {
+            parts.push({ type: 'text', text: event.content });
+          }
+          msgs[msgs.length - 1] = withAssistantParts(last, parts);
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'tool_use_start': {
+      const toolCall: ToolCall = {
+        toolUseId: event.toolUseId,
+        toolName: event.toolName,
+        status: 'running',
+        startedAt: Date.now(),
+      };
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const parts = [...(last.contentParts || [])];
+          const exists = parts.some(
+            p => p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
+          );
+          if (!exists) {
+            parts.push({ type: 'tool_use', toolCall });
+          }
+          msgs[msgs.length - 1] = { ...last, contentParts: parts };
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'tool_use_input_delta': {
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const parts = (last.contentParts || []).map(p => {
+            if (p.type !== 'tool_use' || p.toolCall.toolUseId !== event.toolUseId) {
+              return p;
+            }
+            const prev = typeof p.toolCall.input === 'string' ? p.toolCall.input : '';
+            return {
+              type: 'tool_use' as const,
+              toolCall: { ...p.toolCall, input: prev + (event.input_delta || '') },
+            };
+          });
+          msgs[msgs.length - 1] = { ...last, contentParts: parts };
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'tool_use_input': {
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const parts = (last.contentParts || []).map(p =>
+            p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
+              ? { type: 'tool_use' as const, toolCall: { ...p.toolCall, input: event.input } }
+              : p
+          );
+          msgs[msgs.length - 1] = { ...last, contentParts: parts };
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'tool_result': {
+      const now = Date.now();
+      set((state) => {
+        const updateTC = (tc: ToolCall) =>
+          tc.toolUseId === event.toolUseId
+            ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
+            : tc;
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const mappedParts = (last.contentParts || []).map(p =>
+            p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
+              ? { type: 'tool_use' as const, toolCall: updateTC(p.toolCall) }
+              : p
+          );
+          const hasResultPart = mappedParts.some(
+            p => p.type === 'tool_result' && p.toolUseId === event.toolUseId
+          );
+          const parts = hasResultPart
+            ? mappedParts
+            : [
+                ...mappedParts,
+                {
+                  type: 'tool_result' as const,
+                  toolUseId: event.toolUseId,
+                  status: event.status,
+                  content: event.content,
+                },
+              ];
+          msgs[msgs.length - 1] = { ...last, contentParts: reconcileToolStatusFromResults(parts) };
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'delegation_start': {
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const parts = [...(last.contentParts || [])];
+          parts.push({
+            type: 'delegation_start',
+            subAgentId: event.subAgentId,
+            subAgentName: event.subAgentName,
+            task: event.task,
+          });
+          msgs[msgs.length - 1] = { ...last, contentParts: parts };
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'delegation_delta': {
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const parts = [...(last.contentParts || [])];
+          const lastPart = parts[parts.length - 1];
+          if (
+            lastPart &&
+            lastPart.type === 'delegation_delta' &&
+            lastPart.subAgentId === event.subAgentId
+          ) {
+            parts[parts.length - 1] = {
+              type: 'delegation_delta',
+              subAgentId: event.subAgentId,
+              subAgentName: event.subAgentName,
+              content: (lastPart.content || '') + (event.content || ''),
+            };
+          } else {
+            parts.push({
+              type: 'delegation_delta',
+              subAgentId: event.subAgentId,
+              subAgentName: event.subAgentName,
+              content: event.content,
+            });
+          }
+          msgs[msgs.length - 1] = { ...last, contentParts: parts };
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'delegation_end': {
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant') {
+          const parts = [...(last.contentParts || [])];
+          parts.push({
+            type: 'delegation_end',
+            subAgentId: event.subAgentId,
+            subAgentName: event.subAgentName,
+            result: event.result,
+          });
+          msgs[msgs.length - 1] = { ...last, contentParts: parts };
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+    case 'artifact_created': {
+      const artifact: Artifact = {
+        id: event.artifactId,
+        type: event.artifactType,
+        title: event.title,
+        language: event.language,
+        content: event.content,
+        url: event.url,
+        version: event.version,
+        versions: [event.version],
+        conversationId: conversationIdRef.current,
+        createdAt: new Date().toISOString(),
+      };
+      set((state) => ({
+        artifacts: [...state.artifacts, artifact],
+        selectedArtifactId: artifact.id,
+        artifactPanelOpen: true,
+        artifactPanelTab: 'artifact',
+      }));
+      break;
+    }
+    case 'artifact_updated': {
+      set((state) => ({
+        artifacts: state.artifacts.map(a =>
+          a.id === event.artifactId
+            ? {
+                ...a,
+                version: event.version,
+                content: event.content ?? a.content,
+                url: event.url ?? a.url,
+                versions: [...(a.versions || []), event.version],
+              }
+            : a
+        ),
+        selectedArtifactId: event.artifactId,
+        artifactPanelOpen: true,
+      }));
+      break;
+    }
+    case 'stream_end': {
+      break;
+    }
+    case 'error': {
+      set((state) => {
+        const msgs = [...state.messages];
+        const last = msgs[msgs.length - 1];
+        const warningText = `\n\n⚠️ ${event.message}`;
+        if (last && last.role === 'assistant') {
+          const parts = [...(last.contentParts || [])];
+          const lastPart = parts[parts.length - 1];
+          if (lastPart && lastPart.type === 'text') {
+            parts[parts.length - 1] = { type: 'text', text: lastPart.text + warningText };
+          } else {
+            parts.push({ type: 'text', text: warningText });
+          }
+          msgs[msgs.length - 1] = withAssistantParts(last, parts);
+        } else {
+          msgs.push({
+            id: `error-${Date.now()}`,
+            conversationId: conversationIdRef.current,
+            role: 'assistant',
+            contentParts: [{ type: 'text', text: `⚠️ ${event.message}` }],
+            createdAt: new Date().toISOString(),
+          });
+        }
+        return { messages: msgs };
+      });
+      break;
+    }
+  }
+};
+
 let pendingEnsureConversationPromise: Promise<string> | null = null;
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -136,9 +523,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ conversationsLoading: true });
     try {
       const data = await apiFetch('/api/conversations');
-      const list = Array.isArray(data)
-        ? (data as Conversation[])
-        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Conversation[]);
+      const list = normalizeListResponse<Conversation>(data);
       set({ conversations: list });
     } catch {
       toast.error(getT().chat.loadConversationsFailed);
@@ -153,9 +538,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
     try {
       const data = await apiFetch(`/api/conversations/search?q=${encodeURIComponent(query)}`);
-      const list = Array.isArray(data)
-        ? (data as Conversation[])
-        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Conversation[]);
+      const list = normalizeListResponse<Conversation>(data);
       set({ conversations: list });
     } catch {
       toast.error(getT().chat.searchConversationsFailed);
@@ -163,6 +546,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   selectConversation: async (id: string) => {
+    const { abortController, isStreaming } = get();
+    if (isStreaming) {
+      abortController?.abort();
+    }
     set({
       currentConversationId: id,
       sidebarOpen: false,
@@ -170,6 +557,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       selectedArtifactId: null,
       files: [],
       quotedMessage: null,
+      isStreaming: false,
+      abortController: null,
+      activeRequestId: null,
     });
     await get().loadMessages(id);
     // Load files for this conversation
@@ -177,6 +567,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   createConversation: () => {
+    const { abortController, isStreaming } = get();
+    if (isStreaming) {
+      abortController?.abort();
+    }
     set({
       currentConversationId: null,
       messages: [],
@@ -187,6 +581,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       files: [],
       pendingAttachments: [],
       quotedMessage: null,
+      isStreaming: false,
+      abortController: null,
+      activeRequestId: null,
     });
   },
 
@@ -301,8 +698,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ archivedLoading: true });
     try {
       const data = await apiFetch('/api/conversations?archived=true');
-      const list = Array.isArray(data) ? data : ((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []);
-      set({ archivedConversations: list as Conversation[], archivedLoading: false });
+      const list = normalizeListResponse<Conversation>(data);
+      set({ archivedConversations: list, archivedLoading: false });
     } catch {
       set({ archivedLoading: false });
     }
@@ -312,28 +709,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ messagesLoading: true });
     try {
       const data = await apiFetch(`/api/conversations/${conversationId}/messages`);
-      const list = Array.isArray(data)
-        ? (data as Message[])
-        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as Message[]);
-      
-      // Process messages: normalize attachments
-      const processedList = list.map(msg => {
-        const updatedMsg = { ...msg };
-        if (updatedMsg.attachments && updatedMsg.attachments.length > 0) {
-          updatedMsg.attachments = updatedMsg.attachments.map((att: Partial<FileAttachment>, idx: number) => ({
-            id: att.id || `att-${idx}-${Date.now()}`,
-            name: att.name || 'Unknown File',
-            size: att.size || 0,
-            status: att.status || 'done',
-            progress: att.progress || 100,
-            url: att.url,
-            type: att.type,
-            mimeType: att.mimeType,
-          }));
-        }
-        return updatedMsg;
-      });
-
+      const list = normalizeListResponse<Message>(data);
+      const processedList = list.map(normalizeMessageForRender);
       set({ messages: processedList });
     } catch {
       toast.error(getT().chat.loadMessagesFailed);
@@ -385,8 +762,28 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return;
     }
 
-    let assistantMessageId = '';
-    let newConversationId = context.currentConversationId;
+    const conversationIdRef = { current: context.currentConversationId ?? '' };
+    const streamEventContext: StreamEventContext = {
+      set,
+      conversationIdRef,
+      onStreamStart: (event) => {
+        if (event.conversationId) {
+          conversationIdRef.current = event.conversationId;
+        }
+        if (event.conversationId && !context.currentConversationId) {
+          const newConv: Conversation = {
+            id: event.conversationId,
+            title: content.slice(0, 20) || '新对话',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          set((state) => ({
+            currentConversationId: event.conversationId,
+            conversations: [newConv, ...state.conversations],
+          }));
+        }
+      },
+    };
 
     try {
       for await (const event of streamChat(
@@ -399,284 +796,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         if (get().activeRequestId !== requestId) {
           break;
         }
-        switch (event.type) {
-          case 'stream_start': {
-            assistantMessageId = event.messageId;
-            if (event.conversationId && !context.currentConversationId) {
-              newConversationId = event.conversationId;
-              const newConv: Conversation = {
-                id: event.conversationId,
-                title: content.slice(0, 20) || '新对话',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              };
-              set((state) => ({
-                currentConversationId: event.conversationId,
-                conversations: [newConv, ...state.conversations],
-              }));
-            }
-            const assistantMessage: Message = {
-              id: assistantMessageId,
-              conversationId: newConversationId ?? '',
-              role: 'assistant',
-              createdAt: new Date().toISOString(),
-              contentParts: [],
-            };
-            set((state) => ({ messages: [...state.messages, assistantMessage] }));
-            break;
-          }
-          case 'text_delta': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === 'text') {
-                  parts[parts.length - 1] = { type: 'text', text: lastPart.text + event.content };
-                } else {
-                  parts.push({ type: 'text', text: event.content });
-                }
-                msgs[msgs.length - 1] = withAssistantParts(last, parts);
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_use_start': {
-            const toolCall: ToolCall = {
-              toolUseId: event.toolUseId,
-              toolName: event.toolName,
-              status: 'running',
-              startedAt: Date.now(),
-            };
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const exists = parts.some(
-                  p => p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
-                );
-                if (!exists) {
-                  parts.push({ type: 'tool_use', toolCall });
-                }
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_use_input_delta': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = (last.contentParts || []).map(p => {
-                  if (p.type !== 'tool_use' || p.toolCall.toolUseId !== event.toolUseId) {
-                    return p;
-                  }
-                  const prev = typeof p.toolCall.input === 'string' ? p.toolCall.input : '';
-                  return {
-                    type: 'tool_use' as const,
-                    toolCall: { ...p.toolCall, input: prev + (event.input_delta || '') },
-                  };
-                });
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_use_input': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = (last.contentParts || []).map(p =>
-                  p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
-                    ? { type: 'tool_use' as const, toolCall: { ...p.toolCall, input: event.input } }
-                    : p
-                );
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_result': {
-            const now = Date.now();
-            set((state) => {
-              const updateTC = (tc: ToolCall) =>
-                tc.toolUseId === event.toolUseId
-                  ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
-                  : tc;
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const mappedParts = (last.contentParts || []).map(p =>
-                  p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
-                    ? { type: 'tool_use' as const, toolCall: updateTC(p.toolCall) }
-                    : p
-                );
-                const hasResultPart = mappedParts.some(
-                  p => p.type === 'tool_result' && p.toolUseId === event.toolUseId
-                );
-                const parts = hasResultPart
-                  ? mappedParts
-                  : [
-                      ...mappedParts,
-                      {
-                        type: 'tool_result' as const,
-                        toolUseId: event.toolUseId,
-                        status: event.status,
-                        content: event.content,
-                      },
-                    ];
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'delegation_start': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                parts.push({
-                  type: 'delegation_start',
-                  subAgentId: event.subAgentId,
-                  subAgentName: event.subAgentName,
-                  task: event.task,
-                });
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'delegation_delta': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const lastPart = parts[parts.length - 1];
-                if (
-                  lastPart &&
-                  lastPart.type === 'delegation_delta' &&
-                  lastPart.subAgentId === event.subAgentId
-                ) {
-                  parts[parts.length - 1] = {
-                    type: 'delegation_delta',
-                    subAgentId: event.subAgentId,
-                    subAgentName: event.subAgentName,
-                    content: (lastPart.content || '') + (event.content || ''),
-                  };
-                } else {
-                  parts.push({
-                    type: 'delegation_delta',
-                    subAgentId: event.subAgentId,
-                    subAgentName: event.subAgentName,
-                    content: event.content,
-                  });
-                }
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'delegation_end': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                parts.push({
-                  type: 'delegation_end',
-                  subAgentId: event.subAgentId,
-                  subAgentName: event.subAgentName,
-                  result: event.result,
-                });
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'artifact_created': {
-            const artifact: Artifact = {
-              id: event.artifactId,
-              type: event.artifactType,
-              title: event.title,
-              language: event.language,
-              content: event.content,
-              url: event.url,
-              version: event.version,
-              versions: [event.version],
-              conversationId: newConversationId ?? '',
-              createdAt: new Date().toISOString(),
-            };
-            set((state) => ({
-              artifacts: [...state.artifacts, artifact],
-              selectedArtifactId: artifact.id,
-              artifactPanelOpen: true,
-              artifactPanelTab: 'artifact',
-            }));
-            break;
-          }
-          case 'artifact_updated': {
-            set((state) => ({
-              artifacts: state.artifacts.map(a =>
-                a.id === event.artifactId
-                  ? {
-                      ...a,
-                      version: event.version,
-                      content: event.content ?? a.content,
-                      url: event.url ?? a.url,
-                      versions: [...(a.versions || []), event.version],
-                    }
-                  : a
-              ),
-              selectedArtifactId: event.artifactId,
-              artifactPanelOpen: true,
-            }));
-            break;
-          }
-          case 'stream_end': {
-            break;
-          }
-          case 'error': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              const warningText = `\n\n⚠️ ${event.message}`;
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === 'text') {
-                  parts[parts.length - 1] = { type: 'text', text: lastPart.text + warningText };
-                } else {
-                  parts.push({ type: 'text', text: warningText });
-                }
-                msgs[msgs.length - 1] = withAssistantParts(last, parts);
-              } else {
-                msgs.push({
-                  id: `error-${Date.now()}`,
-                  conversationId: newConversationId ?? '',
-                  role: 'assistant',
-                  contentParts: [{ type: 'text', text: `⚠️ ${event.message}` }],
-                  createdAt: new Date().toISOString(),
-                });
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-        }
+        applyStreamEvent(event, streamEventContext);
       }
     } catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
@@ -702,11 +822,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   stopGeneration: () => {
     const { abortController } = get();
     abortController?.abort();
-    set({ isStreaming: false, abortController: null, activeRequestId: null });
+    set((state) => ({
+      isStreaming: false,
+      abortController: null,
+      activeRequestId: null,
+      messages: settleRunningToolCalls(state.messages, 'error'),
+    }));
   },
 
   regenerateLastMessage: async () => {
-    const { messages, currentConversationId } = get();
+    const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const snapshot = get();
+    if (snapshot.isStreaming) {
+      return;
+    }
+    const { messages, currentConversationId } = snapshot;
     if (!currentConversationId || messages.length < 2) return;
 
     const newMessages = [...messages];
@@ -721,10 +851,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const lastUser = newMessages[newMessages.length - 1];
     if (!lastUser || lastUser.role !== 'user') return;
 
-    set({ messages: newMessages, isStreaming: true });
+    set({ messages: newMessages, isStreaming: true, activeRequestId: requestId });
 
     const abortController = new AbortController();
     set({ abortController });
+    const conversationIdRef = { current: currentConversationId };
+    const streamEventContext: StreamEventContext = {
+      set,
+      conversationIdRef,
+    };
 
     try {
       const chatStream = assistantMessageIdToRegenerate
@@ -738,276 +873,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           );
 
       for await (const event of chatStream) {
-        switch (event.type) {
-          case 'stream_start': {
-            const assistantMessage: Message = {
-              id: event.messageId,
-              conversationId: currentConversationId,
-              role: 'assistant',
-              createdAt: new Date().toISOString(),
-              contentParts: [],
-            };
-            set((state) => ({ messages: [...state.messages, assistantMessage] }));
-            break;
-          }
-          case 'text_delta': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === 'text') {
-                  parts[parts.length - 1] = { type: 'text', text: lastPart.text + event.content };
-                } else {
-                  parts.push({ type: 'text', text: event.content });
-                }
-                msgs[msgs.length - 1] = withAssistantParts(last, parts);
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_use_start': {
-            const toolCall: ToolCall = {
-              toolUseId: event.toolUseId,
-              toolName: event.toolName,
-              status: 'running',
-              startedAt: Date.now(),
-            };
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const exists = parts.some(
-                  p => p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
-                );
-                if (!exists) {
-                  parts.push({ type: 'tool_use', toolCall });
-                }
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_use_input_delta': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = (last.contentParts || []).map(p => {
-                  if (p.type !== 'tool_use' || p.toolCall.toolUseId !== event.toolUseId) {
-                    return p;
-                  }
-                  const prev = typeof p.toolCall.input === 'string' ? p.toolCall.input : '';
-                  return {
-                    type: 'tool_use' as const,
-                    toolCall: { ...p.toolCall, input: prev + (event.input_delta || '') },
-                  };
-                });
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_use_input': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = (last.contentParts || []).map(p =>
-                  p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
-                    ? { type: 'tool_use' as const, toolCall: { ...p.toolCall, input: event.input } }
-                    : p
-                );
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'tool_result': {
-            const now = Date.now();
-            set((state) => {
-              const updateTC = (tc: ToolCall) =>
-                tc.toolUseId === event.toolUseId
-                  ? { ...tc, status: event.status as ToolCall['status'], duration: now - tc.startedAt }
-                  : tc;
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const mappedParts = (last.contentParts || []).map(p =>
-                  p.type === 'tool_use' && p.toolCall.toolUseId === event.toolUseId
-                    ? { type: 'tool_use' as const, toolCall: updateTC(p.toolCall) }
-                    : p
-                );
-                const hasResultPart = mappedParts.some(
-                  p => p.type === 'tool_result' && p.toolUseId === event.toolUseId
-                );
-                const parts = hasResultPart
-                  ? mappedParts
-                  : [
-                      ...mappedParts,
-                      {
-                        type: 'tool_result' as const,
-                        toolUseId: event.toolUseId,
-                        status: event.status,
-                        content: event.content,
-                      },
-                    ];
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'delegation_start': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                parts.push({
-                  type: 'delegation_start',
-                  subAgentId: event.subAgentId,
-                  subAgentName: event.subAgentName,
-                  task: event.task,
-                });
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'delegation_delta': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const lastPart = parts[parts.length - 1];
-                if (
-                  lastPart &&
-                  lastPart.type === 'delegation_delta' &&
-                  lastPart.subAgentId === event.subAgentId
-                ) {
-                  parts[parts.length - 1] = {
-                    type: 'delegation_delta',
-                    subAgentId: event.subAgentId,
-                    subAgentName: event.subAgentName,
-                    content: (lastPart.content || '') + (event.content || ''),
-                  };
-                } else {
-                  parts.push({
-                    type: 'delegation_delta',
-                    subAgentId: event.subAgentId,
-                    subAgentName: event.subAgentName,
-                    content: event.content,
-                  });
-                }
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'delegation_end': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                parts.push({
-                  type: 'delegation_end',
-                  subAgentId: event.subAgentId,
-                  subAgentName: event.subAgentName,
-                  result: event.result,
-                });
-                msgs[msgs.length - 1] = { ...last, contentParts: parts };
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
-          case 'artifact_created': {
-            const artifact: Artifact = {
-              id: event.artifactId,
-              type: event.artifactType,
-              title: event.title,
-              language: event.language,
-              content: event.content,
-              url: event.url,
-              version: event.version,
-              versions: [event.version],
-              conversationId: currentConversationId,
-              createdAt: new Date().toISOString(),
-            };
-            set((state) => ({
-              artifacts: [...state.artifacts, artifact],
-              selectedArtifactId: artifact.id,
-              artifactPanelOpen: true,
-              artifactPanelTab: 'artifact',
-            }));
-            break;
-          }
-          case 'artifact_updated': {
-            set((state) => ({
-              artifacts: state.artifacts.map(a =>
-                a.id === event.artifactId
-                  ? {
-                      ...a,
-                      version: event.version,
-                      content: event.content ?? a.content,
-                      url: event.url ?? a.url,
-                      versions: [...(a.versions || []), event.version],
-                    }
-                  : a
-              ),
-              selectedArtifactId: event.artifactId,
-              artifactPanelOpen: true,
-            }));
-            break;
-          }
-          case 'stream_end':
-            break;
-          case 'error': {
-            set((state) => {
-              const msgs = [...state.messages];
-              const last = msgs[msgs.length - 1];
-              const warningText = `\n\n⚠️ ${event.message}`;
-              if (last && last.role === 'assistant') {
-                const parts = [...(last.contentParts || [])];
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === 'text') {
-                  parts[parts.length - 1] = { type: 'text', text: lastPart.text + warningText };
-                } else {
-                  parts.push({ type: 'text', text: warningText });
-                }
-                msgs[msgs.length - 1] = withAssistantParts(last, parts);
-              } else {
-                msgs.push({
-                  id: `error-${Date.now()}`,
-                  conversationId: currentConversationId,
-                  role: 'assistant',
-                  contentParts: [{ type: 'text', text: `⚠️ ${event.message}` }],
-                  createdAt: new Date().toISOString(),
-                });
-              }
-              return { messages: msgs };
-            });
-            break;
-          }
+        if (get().activeRequestId !== requestId) {
+          break;
         }
+        applyStreamEvent(event, streamEventContext);
       }
     } catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
         toast.error(getT().chat.sendMessageFailed);
       }
     } finally {
-      set({ isStreaming: false, abortController: null });
+      set((state) => {
+        if (state.activeRequestId !== requestId) {
+          return state;
+        }
+        return { ...state, isStreaming: false, abortController: null, activeRequestId: null };
+      });
     }
   },
 
@@ -1043,9 +924,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   loadFiles: async (conversationId: string) => {
     try {
       const data = await apiFetch(`/api/conversations/${conversationId}/files`);
-      const list = Array.isArray(data)
-        ? (data as FileItem[])
-        : (((data as Record<string, unknown>)?.content ?? (data as Record<string, unknown>)?.items ?? []) as FileItem[]);
+      const list = normalizeListResponse<FileItem>(data);
       set({ files: list });
     } catch {
       // silently fail

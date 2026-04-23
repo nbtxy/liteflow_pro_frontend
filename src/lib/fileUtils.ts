@@ -57,6 +57,20 @@ export async function fetchFileBlobUrl(conversationId: string, filePath: string)
   return URL.createObjectURL(blob);
 }
 
+export async function fetchFileThumbnailSignedUrl(
+  conversationId: string,
+  filePath: string,
+  width = 160,
+  height = 160
+): Promise<string> {
+  const query = `path=${encodeURIComponent(filePath)}&w=${width}&h=${height}`;
+  const data = await apiFetch<{ url?: string }>(`/api/conversations/${conversationId}/files/thumbnail-url?${query}`);
+  if (!data?.url) {
+    throw new Error('Thumbnail URL is empty');
+  }
+  return data.url;
+}
+
 /**
  * 带认证的文件删除
  * 后端接口: DELETE /api/conversations/{conversationId}/files/delete?path={path}

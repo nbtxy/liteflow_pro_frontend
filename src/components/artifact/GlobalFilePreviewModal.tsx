@@ -5,7 +5,7 @@ import { useChatStore } from '@/stores/chat';
 import type { FileItem, Artifact } from '@/lib/types';
 import { useLanguage } from '@/lib/i18n/context';
 import { translations } from '@/lib/i18n/translations';
-import { downloadFileWithAuth, fetchFileContent, fetchFileBlobUrl } from '@/lib/fileUtils';
+import { downloadFileWithAuth, fetchFileBlobUrl, fetchFileContent, fetchFileThumbnailSignedUrl } from '@/lib/fileUtils';
 import { toast } from '@/components/ui/Toast';
 import { md } from '@/lib/markdown';
 
@@ -28,8 +28,64 @@ async function renderMermaid(container: HTMLElement) {
 }
 
 export function GlobalFilePreviewModal() {
-  const { previewFile, setPreviewFile, artifacts, currentConversationId } = useChatStore();
+  const { previewFile, setPreviewFile, artifacts, currentConversationId, files } = useChatStore();
   const { t } = useLanguage();
+
+  const fileKey = (file: FileItem) => `${file.artifactId || ''}|${file.path || file.name}|${file.version || ''}|${file.createdAt || ''}`;
+  const previewFileKey = previewFile ? fileKey(previewFile) : '';
+  const orderedFiles = previewFile
+    ? (files && files.length > 0 ? files : [previewFile])
+    : [];
+  const currentIndex = Math.max(0, orderedFiles.findIndex((item) => fileKey(item) === previewFileKey));
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < orderedFiles.length - 1;
+
+  const handlePrev = () => {
+    if (!hasPrev) return;
+    setPreviewFile(orderedFiles[currentIndex - 1]);
+  };
+
+  const handleNext = () => {
+    if (!hasNext) return;
+    setPreviewFile(orderedFiles[currentIndex + 1]);
+  };
+
+  React.useEffect(() => {
+    if (!previewFile) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const isEditable =
+        target?.isContentEditable ||
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select';
+      if (isEditable) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setPreviewFile(null);
+        return;
+      }
+      if (event.key === 'ArrowLeft' && hasPrev) {
+        event.preventDefault();
+        setPreviewFile(orderedFiles[currentIndex - 1]);
+        return;
+      }
+      if (event.key === 'ArrowRight' && hasNext) {
+        event.preventDefault();
+        setPreviewFile(orderedFiles[currentIndex + 1]);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [currentIndex, hasNext, hasPrev, orderedFiles, previewFile, setPreviewFile]);
 
   if (!previewFile) return null;
 
@@ -74,8 +130,35 @@ export function GlobalFilePreviewModal() {
             {previewFile.version && (
               <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md font-medium">v{previewFile.version}</span>
             )}
+            {orderedFiles.length > 1 && (
+              <span className="text-xs px-2 py-1 bg-teal-50 text-teal-700 rounded-md font-medium">
+                {currentIndex + 1} / {orderedFiles.length}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+            <button
+              onClick={handlePrev}
+              disabled={!hasPrev}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                hasPrev
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              上一个
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={!hasNext}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                hasNext
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              下一个
+            </button>
             <button
               onClick={handleDownload}
               className="px-4 py-2 text-sm font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors flex items-center gap-2"
@@ -99,10 +182,114 @@ export function GlobalFilePreviewModal() {
         </div>
 
         {/* Modal Content */}
-        <div className="flex-1 overflow-auto bg-gray-50/50 relative">
-          <FilePreviewContent file={previewFile} artifacts={artifacts} conversationId={currentConversationId} t={t} />
+        <div className="flex-1 bg-gray-50/50 relative flex min-h-0">
+          <div className="flex-1 overflow-auto">
+            <FilePreviewContent file={previewFile} artifacts={artifacts} conversationId={currentConversationId} t={t} />
+          </div>
+          {orderedFiles.length > 1 && (
+            <aside className="w-48 border-l border-gray-200 bg-white/95 flex-shrink-0 overflow-auto">
+              <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
+                文件列表
+              </div>
+              <div className="p-2 space-y-2">
+                {orderedFiles.map((item) => {
+                  const active = fileKey(item) === previewFileKey;
+                  return (
+                    <button
+                      key={fileKey(item)}
+                      onClick={() => setPreviewFile(item)}
+                      className={`w-full text-left p-2 rounded-lg border transition-colors ${
+                        active
+                          ? 'border-teal-200 bg-teal-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      }`}
+                    >
+                      <ThumbPreview
+                        file={item}
+                        artifact={item.artifactId ? artifacts.find(a => a.id === item.artifactId) : undefined}
+                        conversationId={currentConversationId}
+                      />
+                      <div className="text-xs font-medium text-gray-700 truncate" title={item.name}>
+                        {item.name}
+                      </div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        {item.version ? `v${item.version}` : item.type}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ThumbPreview({
+  file,
+  artifact,
+  conversationId,
+}: {
+  file: FileItem;
+  artifact?: Artifact;
+  conversationId: string | null;
+}) {
+  const isImageFile = file.type === 'IMAGE' || file.name.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i);
+  const [thumbnailUrl, setThumbnailUrl] = React.useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isImageFile || artifact?.content) {
+      return;
+    }
+    if (!conversationId) {
+      return;
+    }
+    const filePath = file.path || file.name;
+    if (!filePath) {
+      return;
+    }
+
+    let canceled = false;
+    fetchFileThumbnailSignedUrl(conversationId, filePath, 160, 160)
+      .then((url) => {
+        if (canceled) {
+          return;
+        }
+        setThumbnailUrl(url);
+      })
+      .catch(() => {
+        if (!canceled) setLoadFailed(true);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [artifact?.content, conversationId, file.name, file.path, isImageFile]);
+
+  if (isImageFile && !loadFailed) {
+    if (artifact?.content?.trim().startsWith('<svg')) {
+      return (
+        <div className="h-16 rounded-md border border-gray-200 bg-white flex items-center justify-center overflow-hidden mb-2">
+          <div dangerouslySetInnerHTML={{ __html: artifact.content }} className="max-w-full max-h-full scale-75 origin-center" />
+        </div>
+      );
+    }
+    if (thumbnailUrl) {
+      return (
+        <div className="h-16 rounded-md border border-gray-200 bg-white overflow-hidden mb-2 flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumbnailUrl} alt={file.name} className="max-w-full max-h-full object-contain" />
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className="h-16 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-2xl mb-2">
+      {getFileIcon(file.type)}
     </div>
   );
 }

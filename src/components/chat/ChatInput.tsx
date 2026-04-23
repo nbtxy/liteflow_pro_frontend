@@ -11,6 +11,7 @@ const BLOCKED_EXTENSIONS = ['.exe', '.bat', '.cmd', '.com', '.msi', '.scr', '.pi
 export function ChatInput() {
   const {
     sendMessage,
+    stopGeneration,
     isStreaming,
     currentConversationId,
     ensureConversation,
@@ -45,6 +46,8 @@ export function ChatInput() {
     setContent('');
     sendMessage(trimmed);
   }, [content, isStreaming, sendMessage, pendingAttachments]);
+
+  const canSend = content.trim().length > 0 || pendingAttachments.some(a => a.status === 'done');
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -271,17 +274,26 @@ export function ChatInput() {
 
             {/* 右侧：发送按钮 */}
             <button
-              onClick={handleSend}
-              disabled={isStreaming || (!content.trim() && !pendingAttachments.some(a => a.status === 'done'))}
+              onClick={isStreaming ? stopGeneration : handleSend}
+              disabled={!isStreaming && !canSend}
               className={`p-2 rounded-xl flex items-center justify-center transition-all duration-200 ${
-                (!content.trim() && !pendingAttachments.some(a => a.status === 'done')) || isStreaming
+                !isStreaming && !canSend
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-black text-white shadow-sm hover:bg-gray-800'
+                  : isStreaming
+                    ? 'bg-teal-600 text-white shadow-sm hover:bg-teal-700'
+                    : 'bg-teal-600 text-white shadow-sm hover:bg-teal-700'
               }`}
+              title={isStreaming ? '停止生成' : '发送消息'}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19V5m0 0l-6 6m6-6l6 6" />
-              </svg>
+              {isStreaming ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19V5m0 0l-6 6m6-6l6 6" />
+                </svg>
+              )}
             </button>
           </div>
         </div>

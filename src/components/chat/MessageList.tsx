@@ -13,7 +13,6 @@ export function MessageList() {
     messages,
     messagesLoading,
     isStreaming,
-    stopGeneration,
     regenerateLastMessage,
     artifacts,
     selectArtifact,
@@ -343,21 +342,6 @@ export function MessageList() {
             </div>
           );
         })}
-
-        {/* 流式输出时显示停止按钮 */}
-        {isStreaming && (
-          <div className="flex justify-center">
-            <button
-              onClick={stopGeneration}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-              停止生成
-            </button>
-          </div>
-        )}
 
         <div ref={messagesEndRef} />
       </div>
