@@ -39,6 +39,16 @@ export function ChatInput() {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
   }, [content]);
 
+  // 会话切换后自动聚焦输入框（新会话创建后也会触发）
+  useEffect(() => {
+    if (isStreaming) return;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    requestAnimationFrame(() => {
+      textarea.focus();
+    });
+  }, [currentConversationId, isStreaming]);
+
   const handleSend = useCallback(() => {
     const trimmed = content.trim();
     const hasAttachments = pendingAttachments.some(a => a.status === 'done');
