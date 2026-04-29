@@ -412,20 +412,33 @@ function RemoteBlobPreview({ conversationId, filePath, fileName, type, t }: {
   const [error, setError] = React.useState(false);
 
   React.useEffect(() => {
+    let canceled = false;
+    let release: (() => void) | null = null;
+
+    setLoading(true);
+    setError(false);
+    setBlobUrl(null);
+
     fetchFileBlobUrl(conversationId, filePath)
-      .then(url => {
-        setBlobUrl(url);
+      .then((handle) => {
+        if (canceled) {
+          handle.release();
+          return;
+        }
+        release = handle.release;
+        setBlobUrl(handle.url);
         setLoading(false);
       })
       .catch(() => {
+        if (canceled) return;
         setError(true);
         setLoading(false);
       });
 
     return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      canceled = true;
+      if (release) release();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, filePath]);
 
   if (loading) {

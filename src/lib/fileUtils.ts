@@ -2,6 +2,12 @@ import { getApiUrl } from './config';
 import { getAccessToken } from './auth';
 import { apiFetch } from './api';
 import OSS from 'ali-oss';
+import {
+  acquireBlobUrl as cacheAcquireBlobUrl,
+  getText as cacheGetText,
+  invalidate as cacheInvalidate,
+  type BlobUrlHandle,
+} from './filePreviewCache';
 
 /**
  * 构建文件下载/预览的完整 URL
@@ -31,31 +37,29 @@ export async function downloadFileWithAuth(conversationId: string, filePath: str
 }
 
 /**
- * 带认证的文件内容读取（返回文本）
+ * 带认证的文件内容读取（返回文本，走两级缓存）
  */
 export async function fetchFileContent(conversationId: string, filePath: string): Promise<string> {
-  const res = await authFetch(getFileDownloadUrl(conversationId, filePath));
-
-  if (!res.ok) {
-    throw new Error(`Fetch failed: ${res.status}`);
-  }
-
-  return res.text();
+  return cacheGetText(conversationId, filePath);
 }
 
 /**
- * 带认证的文件内容读取（返回 blob URL，用于图片/PDF 等二进制预览）
+ * 带认证的文件内容读取（返回 blob URL handle，用于图片/PDF 等二进制预览）
+ * 调用方在不再使用时必须调 handle.release() 以释放该 URL。Blob 本身仍由缓存持有。
  */
-export async function fetchFileBlobUrl(conversationId: string, filePath: string): Promise<string> {
-  const res = await authFetch(getFileDownloadUrl(conversationId, filePath));
-
-  if (!res.ok) {
-    throw new Error(`Fetch failed: ${res.status}`);
-  }
-
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
+export async function fetchFileBlobUrl(
+  conversationId: string,
+  filePath: string,
+): Promise<BlobUrlHandle> {
+  return cacheAcquireBlobUrl(conversationId, filePath);
 }
+
+interface ThumbnailMemoEntry {
+  url: string;
+  expiresAt: number;
+}
+const thumbnailMemo = new Map<string, ThumbnailMemoEntry>();
+const THUMBNAIL_TTL_MS = 9 * 60 * 1000;
 
 export async function fetchFileThumbnailSignedUrl(
   conversationId: string,
@@ -63,11 +67,17 @@ export async function fetchFileThumbnailSignedUrl(
   width = 160,
   height = 160
 ): Promise<string> {
+  const memoKey = `${conversationId}::${filePath}::${width}x${height}`;
+  const cached = thumbnailMemo.get(memoKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.url;
+  }
   const query = `path=${encodeURIComponent(filePath)}&w=${width}&h=${height}`;
   const data = await apiFetch<{ url?: string }>(`/api/conversations/${conversationId}/files/thumbnail-url?${query}`);
   if (!data?.url) {
     throw new Error('Thumbnail URL is empty');
   }
+  thumbnailMemo.set(memoKey, { url: data.url, expiresAt: Date.now() + THUMBNAIL_TTL_MS });
   return data.url;
 }
 
@@ -83,6 +93,13 @@ export async function deleteFileWithAuth(conversationId: string, filePath: strin
 
   if (!res.ok) {
     throw new Error(`Delete failed: ${res.status}`);
+  }
+
+  await cacheInvalidate(conversationId, filePath);
+  for (const [k] of thumbnailMemo) {
+    if (k.startsWith(`${conversationId}::${filePath}::`)) {
+      thumbnailMemo.delete(k);
+    }
   }
 }
 
